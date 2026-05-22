@@ -9,8 +9,8 @@ const shared = {
   target: "es2022",
   sourcemap: true,
   alias: {
-    "cmstr":         "/home/rg/Code/cmstr/clients/ts/mod.ts",
-    "cmstr/hashing": "/home/rg/Code/cmstr/src/api/storage/kv/hashing.ts",
+    "cmstr":         "./vendor/cmstr/mod.ts",
+    "cmstr/hashing": "./vendor/cmstr/hashing.ts",
   },
   tsconfig: "tsconfig.json",
 };

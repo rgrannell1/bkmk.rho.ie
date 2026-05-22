@@ -9,8 +9,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "cmstr": ["/home/rg/Code/cmstr/clients/ts/mod.ts"],
-      "cmstr/hashing": ["/home/rg/Code/cmstr/src/api/storage/kv/hashing.ts"]
+      "cmstr": ["./vendor/cmstr/mod.ts"],
+      "cmstr/hashing": ["./vendor/cmstr/hashing.ts"]
     }
   },
   "include": ["ts/**/*.ts"]

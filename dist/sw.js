@@ -1,10 +1,10 @@
 // Service worker — network-first; cache is offline fallback only.
 
-const CACHE = 'bkmk-wix4fglg'
+const CACHE = 'bkmk-y763lmpy'
 
 const APP_SHELL = [
   '/',
-  '/js/app-WIX4FGLG.js',
+  '/js/app-Y763LMPY.js',
   '/css/app-D4LZOPCS.css',
   '/manifest.json',
   '/icons/icon.svg',

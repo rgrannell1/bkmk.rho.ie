@@ -6,9 +6,8 @@ import { readdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
 const ALIAS = {
-  // Cross-project links into cmstr — no duplication of protocol logic
-  "cmstr":         "/home/rg/Code/cmstr/clients/ts/mod.ts",
-  "cmstr/hashing": "/home/rg/Code/cmstr/src/api/storage/kv/hashing.ts",
+  "cmstr":         "./vendor/cmstr/mod.ts",
+  "cmstr/hashing": "./vendor/cmstr/hashing.ts",
 };
 
 function cleanStale() {
