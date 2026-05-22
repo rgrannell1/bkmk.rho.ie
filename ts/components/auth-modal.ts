@@ -1,0 +1,82 @@
+// AuthModal — token entry; shown on first load (no token) or when 'a' is pressed
+// @work.md
+
+import m from "mithril";
+import { store } from "../state.ts";
+import { writeToken } from "../storage.ts";
+import { startSync } from "../boot.ts";
+
+// Draft token held at module level — survives re-renders, reset on successful submit.
+let tokenDraft = "";
+
+// -- Handlers --
+
+function onTokenInput(event: Event): void {
+  tokenDraft = (event.target as HTMLInputElement).value;
+}
+
+async function submitToken(event: Event): Promise<void> {
+  event.preventDefault();
+  const form  = event.currentTarget as HTMLFormElement;
+  const input = form.querySelector("input") as HTMLInputElement;
+  const token = (input?.value ?? tokenDraft).trim();
+  if (!token) return;
+  await writeToken(token);
+  store.setToken(token);
+  tokenDraft = "";
+  startSync(token).catch(console.error);
+}
+
+// Closes only when a token already exists (first-time auth is mandatory).
+function closeIfAuthed(): void {
+  if (store.state.token) store.closeAuthModal();
+}
+
+// Escape key — same guard as backdrop/close-button click.
+// No m.redraw() here — closeIfAuthed() calls it internally if it does anything.
+function onEscKey(event: KeyboardEvent): void {
+  if (event.key === "Escape") closeIfAuthed();
+}
+
+// Stop clicks inside the panel from bubbling to the backdrop.
+function onPanelClick(event: Event): void {
+  event.stopPropagation();
+}
+
+// -- Component --
+
+export function AuthModal() {
+  return {
+    view() {
+      if (!store.state.showAuthModal) return null;
+
+      const canClose = Boolean(store.state.token);
+
+      return m("div.modal-backdrop", {
+        onclick:  closeIfAuthed,
+        oncreate: () => document.addEventListener("keydown", onEscKey),
+        onremove: () => document.removeEventListener("keydown", onEscKey),
+      }, [
+        m("div.modal-panel", { onclick: onPanelClick }, [
+          canClose
+            ? m("button.modal-close[type=button]", { onclick: () => store.closeAuthModal() }, "×")
+            : null,
+          m("p.modal-title", "AUTHENTICATE"),
+          m("p.modal-subtitle", "bearer token — cs.rho.ie"),
+          m("form.modal-form", { onsubmit: submitToken }, [
+            m("input.modal-input", {
+              type:         "password",
+              placeholder:  "token…",
+              oninput:      onTokenInput,
+              autocomplete: "off",
+              oncreate(vnode: m.VnodeDOM) {
+                (vnode.dom as HTMLInputElement).focus();
+              },
+            }),
+            m("button.modal-submit[type=submit]", "CONNECT"),
+          ]),
+        ]),
+      ]);
+    },
+  };
+}

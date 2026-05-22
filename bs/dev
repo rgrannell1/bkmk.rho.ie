@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+// Watch mode — rebuilds JS and CSS on any source change
+
+import * as esbuild from "esbuild";
+
+const shared = {
+  bundle: true,
+  platform: "browser",
+  target: "es2022",
+  sourcemap: true,
+  alias: {
+    "cmstr":         "/home/rg/Code/cmstr/clients/ts/mod.ts",
+    "cmstr/hashing": "/home/rg/Code/cmstr/src/api/storage/kv/hashing.ts",
+  },
+  tsconfig: "tsconfig.json",
+};
+
+const [jsCtx, cssCtx] = await Promise.all([
+  esbuild.context({
+    ...shared,
+    entryPoints: ["ts/index.ts"],
+    format: "esm",
+    outfile: "dist/js/app.js",
+  }),
+  esbuild.context({
+    ...shared,
+    entryPoints: ["css/app.css"],
+    outfile: "dist/css/app.css",
+  }),
+]);
+
+await Promise.all([jsCtx.watch(), cssCtx.watch()]);
+console.log("watching…");
