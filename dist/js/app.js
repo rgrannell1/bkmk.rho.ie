@@ -4760,6 +4760,10 @@ function displayUrl(url) {
 function openUrl(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
+function tagChips(tags) {
+  if (!tags?.length) return null;
+  return (0, import_mithril5.default)("span.card-tags", tags.map((tag) => (0, import_mithril5.default)("span.card-tag", tag)));
+}
 function BookmarkCard() {
   return {
     view(vnode) {
@@ -4771,7 +4775,8 @@ function BookmarkCard() {
         onmouseenter: store.selectIdx.bind(store, idx)
       }, [
         (0, import_mithril5.default)("span.card-cursor", selected ? ">" : " "),
-        (0, import_mithril5.default)("span.card-url", bookmark.title ?? displayUrl(bookmark.url))
+        (0, import_mithril5.default)("span.card-url", bookmark.title ?? displayUrl(bookmark.url)),
+        tagChips(bookmark.tags)
       ]);
     }
   };

@@ -139,6 +139,22 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  flex: 1;
+  min-width: 0;
+}
+.card-tags {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+.card-tag {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.35rem;
+  white-space: nowrap;
 }
 .bookmark-list {
   flex: 1;

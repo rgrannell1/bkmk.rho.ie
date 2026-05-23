@@ -30,6 +30,11 @@ function openUrl(url: string): void {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function tagChips(tags: string[] | undefined): m.Children {
+  if (!tags?.length) return null;
+  return m("span.card-tags", tags.map(tag => m("span.card-tag", tag)));
+}
+
 export function BookmarkCard() {
   return {
     view(vnode: m.Vnode<CardAttrs>) {
@@ -43,6 +48,7 @@ export function BookmarkCard() {
       }, [
         m("span.card-cursor", selected ? ">" : " "),
         m("span.card-url", bookmark.title ?? displayUrl(bookmark.url)),
+        tagChips(bookmark.tags),
       ]);
     },
   };
