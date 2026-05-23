@@ -3,6 +3,7 @@
 
 import m from "mithril";
 import { store } from "../state.ts";
+import { runSearch } from "../search.ts";
 import type { Bookmark } from "../types.ts";
 
 type CardAttrs = {
@@ -30,9 +31,17 @@ function openUrl(url: string): void {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function onTagClick(tag: string, event: MouseEvent): void {
+  event.stopPropagation();
+  const query = `tag:${tag}`;
+  store.setQuery(query, runSearch(query, store.state.bookmarks));
+}
+
 function tagChips(tags: string[] | undefined): m.Children {
   if (!tags?.length) return null;
-  return m("span.card-tags", tags.map(tag => m("span.card-tag", tag)));
+  return m("span.card-tags", tags.map(tag =>
+    m("span.card-tag", { onclick: onTagClick.bind(null, tag) }, tag)
+  ));
 }
 
 export function BookmarkCard() {

@@ -4774,9 +4774,16 @@ function displayUrl(url) {
 function openUrl(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
+function onTagClick(tag, event) {
+  event.stopPropagation();
+  const query = `tag:${tag}`;
+  store.setQuery(query, runSearch(query, store.state.bookmarks));
+}
 function tagChips(tags) {
   if (!tags?.length) return null;
-  return (0, import_mithril5.default)("span.card-tags", tags.map((tag) => (0, import_mithril5.default)("span.card-tag", tag)));
+  return (0, import_mithril5.default)("span.card-tags", tags.map(
+    (tag) => (0, import_mithril5.default)("span.card-tag", { onclick: onTagClick.bind(null, tag) }, tag)
+  ));
 }
 function BookmarkCard() {
   return {
