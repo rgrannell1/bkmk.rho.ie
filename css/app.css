@@ -44,6 +44,18 @@ html, body {
   padding-bottom: 5rem;
 }
 
+/* ── Brand ── */
+
+.brand {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.25rem 0 0.5rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
 /* ── Prompt ── */
 
 .prompt-line {

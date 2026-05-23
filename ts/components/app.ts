@@ -24,6 +24,7 @@ export function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return m("div.app-inner", [
+        m("div.brand", "bkmk"),
         m(authModal),
         writeOnly ? null : m(syncProgress),
         writeOnly ? null : m(prompt),

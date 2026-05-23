@@ -4771,7 +4771,7 @@ function BookmarkCard() {
         onmouseenter: store.selectIdx.bind(store, idx)
       }, [
         (0, import_mithril5.default)("span.card-cursor", selected ? ">" : " "),
-        (0, import_mithril5.default)("span.card-url", displayUrl(bookmark.url))
+        (0, import_mithril5.default)("span.card-url", bookmark.title ?? displayUrl(bookmark.url))
       ]);
     }
   };
@@ -5041,6 +5041,7 @@ function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return (0, import_mithril10.default)("div.app-inner", [
+        (0, import_mithril10.default)("div.brand", "bkmk"),
         (0, import_mithril10.default)(authModal),
         writeOnly ? null : (0, import_mithril10.default)(syncProgress),
         writeOnly ? null : (0, import_mithril10.default)(prompt),

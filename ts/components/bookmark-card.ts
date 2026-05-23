@@ -42,7 +42,7 @@ export function BookmarkCard() {
         onmouseenter: store.selectIdx.bind(store, idx),
       }, [
         m("span.card-cursor", selected ? ">" : " "),
-        m("span.card-url", displayUrl(bookmark.url)),
+        m("span.card-url", bookmark.title ?? displayUrl(bookmark.url)),
       ]);
     },
   };
