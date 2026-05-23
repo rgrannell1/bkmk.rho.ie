@@ -2289,6 +2289,20 @@ var Store = class {
     applySyncStatus(this.#state, { kind: "done" });
     import_mithril.default.redraw();
   }
+  beginPoll() {
+    applySyncStatus(this.#state, { kind: "polling" });
+    import_mithril.default.redraw();
+  }
+  pollComplete() {
+    applySyncStatus(this.#state, { kind: "upToDate" });
+    import_mithril.default.redraw();
+    setTimeout(() => {
+      if (this.#state.syncStatus.kind === "upToDate") {
+        applySyncStatus(this.#state, { kind: "idle" });
+        import_mithril.default.redraw();
+      }
+    }, 3e3);
+  }
   errorSync(message) {
     applySyncStatus(this.#state, { kind: "error", message });
     import_mithril.default.redraw();
@@ -4596,8 +4610,10 @@ var syncInProgress = false;
 async function pollOnce(token) {
   if (syncInProgress) return;
   syncInProgress = true;
+  store.beginPoll();
   try {
     await runDiffSync(token);
+    store.pollComplete();
   } finally {
     syncInProgress = false;
   }
@@ -4683,15 +4699,24 @@ function SyncProgress() {
     view() {
       const status = store.state.syncStatus;
       if (status.kind === "error") {
+        return (0, import_mithril3.default)("div.sync-progress", (0, import_mithril3.default)("span.sync-progress-error", status.message));
+      }
+      if (status.kind === "syncing") {
         return (0, import_mithril3.default)("div.sync-progress", [
-          (0, import_mithril3.default)("span.sync-progress-error", status.message)
+          (0, import_mithril3.default)("div.sync-progress-track", (0, import_mithril3.default)("div.sync-progress-bar")),
+          (0, import_mithril3.default)("span.sync-progress-label", progressLabel(status.received))
         ]);
       }
-      if (status.kind !== "syncing") return null;
-      return (0, import_mithril3.default)("div.sync-progress", [
-        (0, import_mithril3.default)("div.sync-progress-track", (0, import_mithril3.default)("div.sync-progress-bar")),
-        (0, import_mithril3.default)("span.sync-progress-label", progressLabel(status.received))
-      ]);
+      if (status.kind === "polling") {
+        return (0, import_mithril3.default)("div.sync-progress", [
+          (0, import_mithril3.default)("div.sync-progress-track", (0, import_mithril3.default)("div.sync-progress-bar")),
+          (0, import_mithril3.default)("span.sync-progress-label", "syncing\u2026")
+        ]);
+      }
+      if (status.kind === "upToDate") {
+        return (0, import_mithril3.default)("div.sync-progress", (0, import_mithril3.default)("span.sync-progress-ok", "up to date"));
+      }
+      return null;
     }
   };
 }

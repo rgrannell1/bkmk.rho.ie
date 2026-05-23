@@ -1,4 +1,4 @@
-// SyncProgress — progress bar and error display during initial NDJSON stream
+// SyncProgress — status bar for initial sync, background polls, and errors
 // @work.md
 
 import m from "mithril";
@@ -14,17 +14,28 @@ export function SyncProgress() {
       const status = store.state.syncStatus;
 
       if (status.kind === "error") {
+        return m("div.sync-progress", m("span.sync-progress-error", status.message));
+      }
+
+      if (status.kind === "syncing") {
         return m("div.sync-progress", [
-          m("span.sync-progress-error", status.message),
+          m("div.sync-progress-track", m("div.sync-progress-bar")),
+          m("span.sync-progress-label", progressLabel(status.received)),
         ]);
       }
 
-      if (status.kind !== "syncing") return null;
+      if (status.kind === "polling") {
+        return m("div.sync-progress", [
+          m("div.sync-progress-track", m("div.sync-progress-bar")),
+          m("span.sync-progress-label", "syncing…"),
+        ]);
+      }
 
-      return m("div.sync-progress", [
-        m("div.sync-progress-track", m("div.sync-progress-bar")),
-        m("span.sync-progress-label", progressLabel(status.received)),
-      ]);
+      if (status.kind === "upToDate") {
+        return m("div.sync-progress", m("span.sync-progress-ok", "up to date"));
+      }
+
+      return null;
     },
   };
 }

@@ -27,6 +27,8 @@ export type Bookmark = {
 export type SyncStatus =
   | { kind: "idle" }
   | { kind: "syncing"; received: number }
+  | { kind: "polling" }
+  | { kind: "upToDate" }
   | { kind: "error"; message: string }
   | { kind: "done" };
 

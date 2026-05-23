@@ -86,8 +86,10 @@ let syncInProgress = false;
 async function pollOnce(token: string): Promise<void> {
   if (syncInProgress) return;
   syncInProgress = true;
+  store.beginPoll();
   try {
     await runDiffSync(token);
+    store.pollComplete();
   } finally {
     syncInProgress = false;
   }

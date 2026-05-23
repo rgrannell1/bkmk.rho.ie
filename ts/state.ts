@@ -126,6 +126,22 @@ class Store {
     m.redraw();
   }
 
+  beginPoll(): void {
+    applySyncStatus(this.#state, { kind: "polling" });
+    m.redraw();
+  }
+
+  pollComplete(): void {
+    applySyncStatus(this.#state, { kind: "upToDate" });
+    m.redraw();
+    setTimeout(() => {
+      if (this.#state.syncStatus.kind === "upToDate") {
+        applySyncStatus(this.#state, { kind: "idle" });
+        m.redraw();
+      }
+    }, 3_000);
+  }
+
   errorSync(message: string): void {
     applySyncStatus(this.#state, { kind: "error", message });
     m.redraw();

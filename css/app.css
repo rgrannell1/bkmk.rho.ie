@@ -403,6 +403,12 @@ html, body {
   letter-spacing: 0.12em;
 }
 
+.sync-progress-ok {
+  color: var(--fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
 /* ── Save bar (write-only mode) ── */
 
 .save-bar {
