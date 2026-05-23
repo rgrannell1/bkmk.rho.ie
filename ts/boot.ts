@@ -69,7 +69,8 @@ export async function startSync(token: string): Promise<void> {
         store.endSync();
         return;
       }
-      // Network error — partial events may have been written; fall through to replay.
+      // Non-auth error — rethrow so the caller's error handler can surface it.
+      throw err;
     }
   }
 

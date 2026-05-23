@@ -4584,6 +4584,7 @@ async function startSync(token) {
         store.endSync();
         return;
       }
+      throw err;
     }
   }
   await replayAndReady();
@@ -4609,7 +4610,11 @@ async function submitToken(event) {
   await writeToken(token);
   store.setToken(token);
   tokenDraft = "";
-  startSync(token).catch(console.error);
+  startSync(token).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
+    store.setFatalError(message, stack);
+  });
 }
 function closeIfAuthed() {
   if (store.state.token) store.closeAuthModal();
@@ -5198,7 +5203,15 @@ async function main() {
   }
   if (token && hadAuthError) store.openAuthModal();
   import_mithril13.default.mount(document.getElementById("app"), App());
-  if (token && !hadAuthError) startSync(token).catch(console.error);
+  if (token && !hadAuthError) startSync(token).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
+    store.setFatalError(message, stack);
+  });
 }
-main().catch(console.error);
+main().catch((err) => {
+  const message = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
+  store.setFatalError(message, stack);
+});
 //# sourceMappingURL=app.js.map
