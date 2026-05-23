@@ -4,6 +4,7 @@
 import * as esbuild from "esbuild";
 import { readdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
+import { createHash } from "crypto";
 
 const ALIAS = {
   "cmstr":         "./vendor/cmstr/mod.ts",
@@ -135,8 +136,11 @@ async function build() {
   const jsPath  = findOutput(jsResult.metafile,  "ts/index.ts");
   const cssPath = findOutput(cssResult.metafile, "css/app.css");
 
-  const hashMatch  = jsPath.match(/-([A-Z0-9]+)\.js$/i);
-  const buildHash  = hashMatch ? hashMatch[1].toLowerCase() : "unknown";
+  const jsHashMatch  = jsPath.match(/-([A-Z0-9]+)\.js$/i);
+  const cssHashMatch = cssPath.match(/-([A-Z0-9]+)\.css$/i);
+  const jsHash  = jsHashMatch  ? jsHashMatch[1]  : "unknown";
+  const cssHash = cssHashMatch ? cssHashMatch[1] : "unknown";
+  const buildHash    = createHash("sha256").update(jsHash + cssHash).digest("hex").slice(0, 8).toLowerCase();
   const cacheVersion = `bkmk-${buildHash}`;
 
   writeFileSync(join("dist", "index.html"), indexHtml(jsPath, cssPath, buildHash));
