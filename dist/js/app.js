@@ -2432,8 +2432,42 @@ var CmstrClient = class {
   async deleteObject(input) {
     return await this.request("DELETE", `/objects/${encodeURIComponent(input.topic)}/${encodeURIComponent(input.id)}`);
   }
+  async postDiff(input) {
+    const { topic, ...body } = input;
+    const result = await this.request("POST", `/diff/${encodeURIComponent(topic)}`, { body });
+    if (result === null) return null;
+    return result;
+  }
   async *streamEvents(input) {
     const url = new URL(`${this.url}/events/${encodeURIComponent(input.topic)}`);
+    if (input.start !== void 0) url.searchParams.set("start", input.start.toString());
+    const response = await fetch(url, {
+      signal: input.signal,
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/x-ndjson" }
+    });
+    if (!response.ok || !response.body) throw new CmstrError(response.status, await response.json());
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let remainder = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = remainder + value;
+        const lines = chunk.split("\n");
+        remainder = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) yield JSON.parse(trimmed);
+        }
+      }
+      if (remainder.trim()) yield JSON.parse(remainder.trim());
+    } finally {
+      reader.cancel().catch(() => {
+      });
+    }
+  }
+  async *streamObjects(input) {
+    const url = new URL(`${this.url}/objects/${encodeURIComponent(input.topic)}`);
     if (input.start !== void 0) url.searchParams.set("start", input.start.toString());
     const response = await fetch(url, {
       signal: input.signal,
@@ -2463,7 +2497,6 @@ var CmstrClient = class {
 };
 
 // ../../cmstr/src/api/storage/kv/hashing.ts
-var UINT64_BYTES = 8;
 var SHA256_BYTES = 32;
 function hexToBytes(hex) {
   const buf = new Uint8Array(hex.length / 2);
@@ -2475,15 +2508,6 @@ function hexToBytes(hex) {
 async function sha256Hex(data) {
   const hash = await crypto.subtle.digest("SHA-256", data.buffer);
   return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-function hashEventBucket(entries) {
-  const buf = new Uint8Array(entries.length * UINT64_BYTES * 2);
-  const view = new DataView(buf.buffer);
-  for (let idx = 0; idx < entries.length; idx++) {
-    view.setBigUint64(idx * UINT64_BYTES * 2, BigInt(entries[idx].id), false);
-    view.setBigUint64(idx * UINT64_BYTES * 2 + UINT64_BYTES, BigInt(entries[idx].updatedAt), false);
-  }
-  return sha256Hex(buf);
 }
 function hashBucketRoot(bucketHashes) {
   const buf = new Uint8Array(bucketHashes.length * SHA256_BYTES);
@@ -2505,7 +2529,7 @@ async function buildBuckets(events) {
   const buckets = await Promise.all(
     bucketStarts.map(async (start) => {
       const entries = bucketMap.get(start).sort((eventA, eventB) => eventA.id - eventB.id).map((event) => ({ id: event.id, updatedAt: event.updatedAt }));
-      const hash = await hashEventBucket(entries);
+      const hash = await hashEventBucket2(entries);
       return { start, end: start + DIFF_BUCKET_SIZE, hash };
     })
   );
@@ -2550,7 +2574,7 @@ async function fetchRange(client, start, end) {
   while (cursor < end) {
     const response = await client.getEvents({
       topic: BOOKMARKS_TOPIC,
-      start: cursor,
+      start: cursor > 0 ? cursor : void 0,
       size: DIFF_BUCKET_SIZE
     });
     if (response.entries.length === 0) break;

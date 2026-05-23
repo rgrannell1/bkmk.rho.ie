@@ -99,7 +99,7 @@ async function fetchRange(
   while (cursor < end) {
     const response = await client.getEvents({
       topic: BOOKMARKS_TOPIC,
-      start: cursor,
+      start: cursor > 0 ? cursor : undefined,
       size: DIFF_BUCKET_SIZE,
     });
     if (response.entries.length === 0) break;
