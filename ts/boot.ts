@@ -6,6 +6,7 @@ import { initialSync, diffSync } from "./sync.ts";
 import { replayEvents } from "./replay.ts";
 import { rebuildIndex, runSearch } from "./search.ts";
 import { store } from "./state.ts";
+import { readQueryParam } from "./url-state.ts";
 
 function onSyncProgress(received: number): void {
   store.progressSync(received);
@@ -36,8 +37,10 @@ async function replayAndReady(): Promise<void> {
   const events = await readAllEvents();
   const bookmarks = replayEvents(events);
   rebuildIndex(bookmarks);
-  const results = runSearch("", bookmarks);
+  const query = readQueryParam();
+  const results = runSearch(query, bookmarks);
   store.setReady(bookmarks, results);
+  if (query) store.setQuery(query, results);
 }
 
 async function runDiffSync(token: string): Promise<void> {

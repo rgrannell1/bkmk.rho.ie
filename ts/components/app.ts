@@ -10,6 +10,7 @@ import { BookmarkList } from "./bookmark-list.ts";
 import { Helpbar } from "./helpbar.ts";
 import { SaveBar } from "./save-bar.ts";
 import { HelpModal } from "./help-modal.ts";
+import { runSearch } from "../search.ts";
 
 // Instantiated once — Mithril compares component identity by reference,
 // so re-calling factory functions on every render would unmount+remount each subtree.
@@ -26,7 +27,7 @@ export function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return m("div.app-inner", [
-        m("div.brand", "bkmk"),
+        m("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
         m(authModal),
         m(helpModal),
         writeOnly ? null : m(syncProgress),

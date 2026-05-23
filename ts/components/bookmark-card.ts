@@ -33,7 +33,7 @@ function openUrl(url: string): void {
 
 function onTagClick(tag: string, event: MouseEvent): void {
   event.stopPropagation();
-  const query = `tag:${tag}`;
+  const query = store.state.query === `tag:${tag}` ? "" : `tag:${tag}`;
   store.setQuery(query, runSearch(query, store.state.bookmarks));
 }
 

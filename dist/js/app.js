@@ -2177,6 +2177,24 @@ async function writeAuthError(flag) {
 
 // ts/state.ts
 var import_mithril = __toESM(require_mithril(), 1);
+
+// ts/url-state.ts
+var QUERY_PARAM = "q";
+function readQueryParam() {
+  return new URLSearchParams(window.location.search).get(QUERY_PARAM) ?? "";
+}
+function writeQueryParam(query) {
+  const params = new URLSearchParams(window.location.search);
+  if (query) {
+    params.set(QUERY_PARAM, query);
+  } else {
+    params.delete(QUERY_PARAM);
+  }
+  const newUrl = params.toString() ? `?${params}` : window.location.pathname;
+  history.replaceState(null, "", newUrl);
+}
+
+// ts/state.ts
 function initialState() {
   return {
     token: null,
@@ -2246,6 +2264,7 @@ var Store = class {
   }
   setQuery(query, results) {
     applyQuery(this.#state, query, results);
+    writeQueryParam(query);
     import_mithril.default.redraw();
   }
   moveSelection(delta) {
@@ -4534,8 +4553,10 @@ async function replayAndReady() {
   const events = await readAllEvents();
   const bookmarks = replayEvents(events);
   rebuildIndex(bookmarks);
-  const results = runSearch("", bookmarks);
+  const query = readQueryParam();
+  const results = runSearch(query, bookmarks);
   store.setReady(bookmarks, results);
+  if (query) store.setQuery(query, results);
 }
 async function runDiffSync(token) {
   const newEvents = await diffSync(token);
@@ -4776,7 +4797,7 @@ function openUrl(url) {
 }
 function onTagClick(tag, event) {
   event.stopPropagation();
-  const query = `tag:${tag}`;
+  const query = store.state.query === `tag:${tag}` ? "" : `tag:${tag}`;
   store.setQuery(query, runSearch(query, store.state.bookmarks));
 }
 function tagChips(tags) {
@@ -5106,7 +5127,7 @@ function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return (0, import_mithril11.default)("div.app-inner", [
-        (0, import_mithril11.default)("div.brand", "bkmk"),
+        (0, import_mithril11.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
         (0, import_mithril11.default)(authModal),
         (0, import_mithril11.default)(helpModal),
         writeOnly ? null : (0, import_mithril11.default)(syncProgress),

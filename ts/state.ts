@@ -3,6 +3,7 @@
 
 import m from "mithril";
 import type { AppState, Bookmark, SyncStatus } from "./types.ts";
+import { writeQueryParam } from "./url-state.ts";
 
 // -- Initial state --
 
@@ -95,6 +96,7 @@ class Store {
 
   setQuery(query: string, results: Bookmark[]): void {
     applyQuery(this.#state, query, results);
+    writeQueryParam(query);
     m.redraw();
   }
 
