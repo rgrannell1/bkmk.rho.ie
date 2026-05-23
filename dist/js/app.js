@@ -4716,7 +4716,7 @@ function SyncProgress() {
       if (status.kind === "upToDate") {
         return (0, import_mithril3.default)("div.sync-progress", (0, import_mithril3.default)("span.sync-progress-ok", "up to date"));
       }
-      return null;
+      return (0, import_mithril3.default)("div.sync-progress");
     }
   };
 }

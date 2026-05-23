@@ -35,7 +35,7 @@ export function SyncProgress() {
         return m("div.sync-progress", m("span.sync-progress-ok", "up to date"));
       }
 
-      return null;
+      return m("div.sync-progress");
     },
   };
 }
