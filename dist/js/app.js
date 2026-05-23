@@ -4828,6 +4828,15 @@ function Prompt() {
 // ts/components/bookmark-list.ts
 var import_mithril7 = __toESM(require_mithril(), 1);
 
+// ts/scroll-state.ts
+var lastScrollMs = 0;
+function markScrolled() {
+  lastScrollMs = Date.now();
+}
+function isScrolling() {
+  return Date.now() - lastScrollMs < 150;
+}
+
 // ts/components/bookmark-card.ts
 var import_mithril5 = __toESM(require_mithril(), 1);
 function cardClass(idx, selected) {
@@ -4865,7 +4874,9 @@ function BookmarkCard() {
       return (0, import_mithril5.default)("div", {
         class: cardClass(idx, selected),
         onclick: openUrl.bind(null, bookmark.url),
-        onmouseenter: store.selectIdx.bind(store, idx)
+        onmouseenter: () => {
+          if (!isScrolling()) store.selectIdx(idx);
+        }
       }, [
         (0, import_mithril5.default)("span.card-cursor", selected ? ">" : " "),
         (0, import_mithril5.default)("span.card-url", bookmark.title ?? displayUrl(bookmark.url)),
@@ -4973,6 +4984,7 @@ function onScroll(event) {
   const el = event.target;
   scrollTop = el.scrollTop;
   viewportHeight = el.clientHeight;
+  markScrolled();
   import_mithril7.default.redraw();
 }
 function onCreateList(vnode) {
