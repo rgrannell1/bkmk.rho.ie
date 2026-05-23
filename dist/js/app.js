@@ -1049,9 +1049,9 @@ var require_build2 = __commonJS({
       var path = template.slice(0, pathEnd);
       var query = {};
       Object.assign(query, params);
-      var resolved = path.replace(/:([^\/\.-]+)(\.{3})?/g, function(m13, key, variadic) {
+      var resolved = path.replace(/:([^\/\.-]+)(\.{3})?/g, function(m14, key, variadic) {
         delete query[key];
-        if (params[key] == null) return m13;
+        if (params[key] == null) return m14;
         return variadic ? params[key] : encodeURIComponent(String(params[key]));
       });
       var newQueryIndex = resolved.indexOf("?");
@@ -1328,8 +1328,8 @@ var require_compileTemplate = __commonJS({
         // don't also accidentally escape `-` and make it harder to detect it to
         // ban it from template parameters.
         /:([^\/.-]+)(\.{3}|\.(?!\.)|-)?|[\\^$*+.()|\[\]{}]/g,
-        function(m13, key, extra) {
-          if (key == null) return "\\" + m13;
+        function(m14, key, extra) {
+          if (key == null) return "\\" + m14;
           keys.push({ k: key, r: extra === "..." });
           if (extra === "...") return "(.*)";
           if (extra === ".") return "([^/]+)\\.";
@@ -1582,26 +1582,26 @@ var require_mithril = __commonJS({
     var mountRedraw = require_mount_redraw2();
     var request = require_request2();
     var router = require_route();
-    var m13 = function m14() {
+    var m14 = function m15() {
       return hyperscript.apply(this, arguments);
     };
-    m13.m = hyperscript;
-    m13.trust = hyperscript.trust;
-    m13.fragment = hyperscript.fragment;
-    m13.Fragment = "[";
-    m13.mount = mountRedraw.mount;
-    m13.route = router;
-    m13.render = require_render2();
-    m13.redraw = mountRedraw.redraw;
-    m13.request = request.request;
-    m13.parseQueryString = require_parse();
-    m13.buildQueryString = require_build();
-    m13.parsePathname = require_parse2();
-    m13.buildPathname = require_build2();
-    m13.vnode = require_vnode();
-    m13.censor = require_censor();
-    m13.domFor = require_domFor();
-    module.exports = m13;
+    m14.m = hyperscript;
+    m14.trust = hyperscript.trust;
+    m14.fragment = hyperscript.fragment;
+    m14.Fragment = "[";
+    m14.mount = mountRedraw.mount;
+    m14.route = router;
+    m14.render = require_render2();
+    m14.redraw = mountRedraw.redraw;
+    m14.request = request.request;
+    m14.parseQueryString = require_parse();
+    m14.buildQueryString = require_build();
+    m14.parsePathname = require_parse2();
+    m14.buildPathname = require_build2();
+    m14.vnode = require_vnode();
+    m14.censor = require_censor();
+    m14.domFor = require_domFor();
+    module.exports = m14;
   }
 });
 
@@ -1616,12 +1616,12 @@ var require_dayjs_min = __commonJS({
       var t = 1e3, e = 6e4, n = 36e5, r = "millisecond", i = "second", s = "minute", u = "hour", a = "day", o = "week", c = "month", f = "quarter", h = "year", d = "date", l = "Invalid Date", $ = /^(\d{4})[-/]?(\d{1,2})?[-/]?(\d{0,2})[Tt\s]*(\d{1,2})?:?(\d{1,2})?:?(\d{1,2})?[.:]?(\d+)?$/, y = /\[([^\]]+)]|Y{1,4}|M{1,4}|D{1,2}|d{1,4}|H{1,2}|h{1,2}|a|A|m{1,2}|s{1,2}|Z{1,2}|SSS/g, M = { name: "en", weekdays: "Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday".split("_"), months: "January_February_March_April_May_June_July_August_September_October_November_December".split("_"), ordinal: function(t2) {
         var e2 = ["th", "st", "nd", "rd"], n2 = t2 % 100;
         return "[" + t2 + (e2[(n2 - 20) % 10] || e2[n2] || e2[0]) + "]";
-      } }, m13 = function(t2, e2, n2) {
+      } }, m14 = function(t2, e2, n2) {
         var r2 = String(t2);
         return !r2 || r2.length >= e2 ? t2 : "" + Array(e2 + 1 - r2.length).join(n2) + t2;
-      }, v = { s: m13, z: function(t2) {
+      }, v = { s: m14, z: function(t2) {
         var e2 = -t2.utcOffset(), n2 = Math.abs(e2), r2 = Math.floor(n2 / 60), i2 = n2 % 60;
-        return (e2 <= 0 ? "+" : "-") + m13(r2, 2, "0") + ":" + m13(i2, 2, "0");
+        return (e2 <= 0 ? "+" : "-") + m14(r2, 2, "0") + ":" + m14(i2, 2, "0");
       }, m: function t2(e2, n2) {
         if (e2.date() < n2.date()) return -t2(n2, e2);
         var r2 = 12 * (n2.year() - e2.year()) + (n2.month() - e2.month()), i2 = e2.clone().add(r2, c), s2 = n2 - i2 < 0, u2 = e2.clone().add(r2 + (s2 ? -1 : 1), c);
@@ -1661,8 +1661,8 @@ var require_dayjs_min = __commonJS({
         function M2(t2) {
           this.$L = w(t2.locale, null, true), this.parse(t2), this.$x = this.$x || t2.x || {}, this[p] = true;
         }
-        var m14 = M2.prototype;
-        return m14.parse = function(t2) {
+        var m15 = M2.prototype;
+        return m15.parse = function(t2) {
           this.$d = (function(t3) {
             var e2 = t3.date, n2 = t3.utc;
             if (null === e2) return /* @__PURE__ */ new Date(NaN);
@@ -1677,33 +1677,33 @@ var require_dayjs_min = __commonJS({
             }
             return new Date(e2);
           })(t2), this.init();
-        }, m14.init = function() {
+        }, m15.init = function() {
           var t2 = this.$d;
           this.$y = t2.getFullYear(), this.$M = t2.getMonth(), this.$D = t2.getDate(), this.$W = t2.getDay(), this.$H = t2.getHours(), this.$m = t2.getMinutes(), this.$s = t2.getSeconds(), this.$ms = t2.getMilliseconds();
-        }, m14.$utils = function() {
+        }, m15.$utils = function() {
           return b;
-        }, m14.isValid = function() {
+        }, m15.isValid = function() {
           return !(this.$d.toString() === l);
-        }, m14.isSame = function(t2, e2) {
+        }, m15.isSame = function(t2, e2) {
           var n2 = O(t2);
           return this.startOf(e2) <= n2 && n2 <= this.endOf(e2);
-        }, m14.isAfter = function(t2, e2) {
+        }, m15.isAfter = function(t2, e2) {
           return O(t2) < this.startOf(e2);
-        }, m14.isBefore = function(t2, e2) {
+        }, m15.isBefore = function(t2, e2) {
           return this.endOf(e2) < O(t2);
-        }, m14.$g = function(t2, e2, n2) {
+        }, m15.$g = function(t2, e2, n2) {
           return b.u(t2) ? this[e2] : this.set(n2, t2);
-        }, m14.unix = function() {
+        }, m15.unix = function() {
           return Math.floor(this.valueOf() / 1e3);
-        }, m14.valueOf = function() {
+        }, m15.valueOf = function() {
           return this.$d.getTime();
-        }, m14.startOf = function(t2, e2) {
+        }, m15.startOf = function(t2, e2) {
           var n2 = this, r2 = !!b.u(e2) || e2, f2 = b.p(t2), l2 = function(t3, e3) {
             var i2 = b.w(n2.$u ? Date.UTC(n2.$y, e3, t3) : new Date(n2.$y, e3, t3), n2);
             return r2 ? i2 : i2.endOf(a);
           }, $2 = function(t3, e3) {
             return b.w(n2.toDate()[t3].apply(n2.toDate("s"), (r2 ? [0, 0, 0, 0] : [23, 59, 59, 999]).slice(e3)), n2);
-          }, y2 = this.$W, M3 = this.$M, m15 = this.$D, v2 = "set" + (this.$u ? "UTC" : "");
+          }, y2 = this.$W, M3 = this.$M, m16 = this.$D, v2 = "set" + (this.$u ? "UTC" : "");
           switch (f2) {
             case h:
               return r2 ? l2(1, 0) : l2(31, 11);
@@ -1711,7 +1711,7 @@ var require_dayjs_min = __commonJS({
               return r2 ? l2(1, M3) : l2(0, M3 + 1);
             case o:
               var g2 = this.$locale().weekStart || 0, D2 = (y2 < g2 ? y2 + 7 : y2) - g2;
-              return l2(r2 ? m15 - D2 : m15 + (6 - D2), M3);
+              return l2(r2 ? m16 - D2 : m16 + (6 - D2), M3);
             case a:
             case d:
               return $2(v2 + "Hours", 0);
@@ -1724,20 +1724,20 @@ var require_dayjs_min = __commonJS({
             default:
               return this.clone();
           }
-        }, m14.endOf = function(t2) {
+        }, m15.endOf = function(t2) {
           return this.startOf(t2, false);
-        }, m14.$set = function(t2, e2) {
+        }, m15.$set = function(t2, e2) {
           var n2, o2 = b.p(t2), f2 = "set" + (this.$u ? "UTC" : ""), l2 = (n2 = {}, n2[a] = f2 + "Date", n2[d] = f2 + "Date", n2[c] = f2 + "Month", n2[h] = f2 + "FullYear", n2[u] = f2 + "Hours", n2[s] = f2 + "Minutes", n2[i] = f2 + "Seconds", n2[r] = f2 + "Milliseconds", n2)[o2], $2 = o2 === a ? this.$D + (e2 - this.$W) : e2;
           if (o2 === c || o2 === h) {
             var y2 = this.clone().set(d, 1);
             y2.$d[l2]($2), y2.init(), this.$d = y2.set(d, Math.min(this.$D, y2.daysInMonth())).$d;
           } else l2 && this.$d[l2]($2);
           return this.init(), this;
-        }, m14.set = function(t2, e2) {
+        }, m15.set = function(t2, e2) {
           return this.clone().$set(t2, e2);
-        }, m14.get = function(t2) {
+        }, m15.get = function(t2) {
           return this[b.p(t2)]();
-        }, m14.add = function(r2, f2) {
+        }, m15.add = function(r2, f2) {
           var d2, l2 = this;
           r2 = Number(r2);
           var $2 = b.p(f2), y2 = function(t2) {
@@ -1748,11 +1748,11 @@ var require_dayjs_min = __commonJS({
           if ($2 === h) return this.set(h, this.$y + r2);
           if ($2 === a) return y2(1);
           if ($2 === o) return y2(7);
-          var M3 = (d2 = {}, d2[s] = e, d2[u] = n, d2[i] = t, d2)[$2] || 1, m15 = this.$d.getTime() + r2 * M3;
-          return b.w(m15, this);
-        }, m14.subtract = function(t2, e2) {
+          var M3 = (d2 = {}, d2[s] = e, d2[u] = n, d2[i] = t, d2)[$2] || 1, m16 = this.$d.getTime() + r2 * M3;
+          return b.w(m16, this);
+        }, m15.subtract = function(t2, e2) {
           return this.add(-1 * t2, e2);
-        }, m14.format = function(t2) {
+        }, m15.format = function(t2) {
           var e2 = this, n2 = this.$locale();
           if (!this.isValid()) return n2.invalidDate || l;
           var r2 = t2 || "YYYY-MM-DDTHH:mm:ssZ", i2 = b.z(this), s2 = this.$H, u2 = this.$m, a2 = this.$M, o2 = n2.weekdays, c2 = n2.months, f2 = n2.meridiem, h2 = function(t3, n3, i3, s3) {
@@ -1818,11 +1818,11 @@ var require_dayjs_min = __commonJS({
               return null;
             })(t3) || i2.replace(":", "");
           }));
-        }, m14.utcOffset = function() {
+        }, m15.utcOffset = function() {
           return 15 * -Math.round(this.$d.getTimezoneOffset() / 15);
-        }, m14.diff = function(r2, d2, l2) {
-          var $2, y2 = this, M3 = b.p(d2), m15 = O(r2), v2 = (m15.utcOffset() - this.utcOffset()) * e, g2 = this - m15, D2 = function() {
-            return b.m(y2, m15);
+        }, m15.diff = function(r2, d2, l2) {
+          var $2, y2 = this, M3 = b.p(d2), m16 = O(r2), v2 = (m16.utcOffset() - this.utcOffset()) * e, g2 = this - m16, D2 = function() {
+            return b.m(y2, m16);
           };
           switch (M3) {
             case h:
@@ -1853,23 +1853,23 @@ var require_dayjs_min = __commonJS({
               $2 = g2;
           }
           return l2 ? $2 : b.a($2);
-        }, m14.daysInMonth = function() {
+        }, m15.daysInMonth = function() {
           return this.endOf(c).$D;
-        }, m14.$locale = function() {
+        }, m15.$locale = function() {
           return D[this.$L];
-        }, m14.locale = function(t2, e2) {
+        }, m15.locale = function(t2, e2) {
           if (!t2) return this.$L;
           var n2 = this.clone(), r2 = w(t2, e2, true);
           return r2 && (n2.$L = r2), n2;
-        }, m14.clone = function() {
+        }, m15.clone = function() {
           return b.w(this.$d, this);
-        }, m14.toDate = function() {
+        }, m15.toDate = function() {
           return new Date(this.valueOf());
-        }, m14.toJSON = function() {
+        }, m15.toJSON = function() {
           return this.isValid() ? this.toISOString() : null;
-        }, m14.toISOString = function() {
+        }, m15.toISOString = function() {
           return this.$d.toISOString();
-        }, m14.toString = function() {
+        }, m15.toString = function() {
           return this.$d.toUTCString();
         }, M2;
       })(), k = _.prototype;
@@ -1887,7 +1887,7 @@ var require_dayjs_min = __commonJS({
 });
 
 // ts/index.ts
-var import_mithril12 = __toESM(require_mithril(), 1);
+var import_mithril13 = __toESM(require_mithril(), 1);
 
 // node_modules/idb/build/index.js
 var instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
@@ -2207,7 +2207,8 @@ function initialState() {
     selectedIdx: 0,
     syncStatus: { kind: "idle" },
     showAuthModal: false,
-    showHelpModal: false
+    showHelpModal: false,
+    fatalError: null
   };
 }
 function applyToken(state, token) {
@@ -2297,6 +2298,10 @@ var Store = class {
   }
   closeAuthModal() {
     applyAuthModal(this.#state, false);
+    import_mithril.default.redraw();
+  }
+  setFatalError(message, stack) {
+    this.#state.fatalError = { message, stack };
     import_mithril.default.redraw();
   }
   openHelpModal() {
@@ -2662,17 +2667,17 @@ var fuzzySearch = (node, query, maxDistance) => {
   if (query === void 0)
     return results;
   const n = query.length + 1;
-  const m13 = n + maxDistance;
-  const matrix = new Uint8Array(m13 * n).fill(maxDistance + 1);
+  const m14 = n + maxDistance;
+  const matrix = new Uint8Array(m14 * n).fill(maxDistance + 1);
   for (let j = 0; j < n; ++j)
     matrix[j] = j;
-  for (let i = 1; i < m13; ++i)
+  for (let i = 1; i < m14; ++i)
     matrix[i * n] = i;
   recurse(node, query, maxDistance, results, matrix, 1, n, "");
   return results;
 };
-var recurse = (node, query, maxDistance, results, matrix, m13, n, prefix) => {
-  const offset = m13 * n;
+var recurse = (node, query, maxDistance, results, matrix, m14, n, prefix) => {
+  const offset = m14 * n;
   key: for (const key of node.keys()) {
     if (key === LEAF) {
       const distance = matrix[offset - 1];
@@ -2680,7 +2685,7 @@ var recurse = (node, query, maxDistance, results, matrix, m13, n, prefix) => {
         results.set(prefix, [node.get(key), distance]);
       }
     } else {
-      let i = m13;
+      let i = m14;
       for (let pos = 0; pos < key.length; ++pos, ++i) {
         const char = key[pos];
         const thisRowOffset = n * i;
@@ -4587,7 +4592,7 @@ async function startSync(token) {
 }
 
 // ts/components/app.ts
-var import_mithril11 = __toESM(require_mithril(), 1);
+var import_mithril12 = __toESM(require_mithril(), 1);
 
 // ts/components/auth-modal.ts
 var import_mithril2 = __toESM(require_mithril(), 1);
@@ -5114,9 +5119,38 @@ function HelpModal() {
   };
 }
 
+// ts/components/error-modal.ts
+var import_mithril11 = __toESM(require_mithril(), 1);
+function copyError() {
+  const err = store.state.fatalError;
+  if (!err) return;
+  const text = `${err.message}
+
+${err.stack}`;
+  navigator.clipboard.writeText(text).catch(() => {
+  });
+}
+function ErrorModal() {
+  return {
+    view() {
+      const err = store.state.fatalError;
+      if (!err) return null;
+      return (0, import_mithril11.default)("div.modal-backdrop", [
+        (0, import_mithril11.default)("div.modal-panel.error-panel", [
+          (0, import_mithril11.default)("p.modal-title", "ERROR"),
+          (0, import_mithril11.default)("p.error-message", err.message),
+          (0, import_mithril11.default)("pre.error-stack", err.stack),
+          (0, import_mithril11.default)("button.modal-submit", { onclick: copyError }, "COPY")
+        ])
+      ]);
+    }
+  };
+}
+
 // ts/components/app.ts
 var authModal = AuthModal();
 var helpModal = HelpModal();
+var errorModal = ErrorModal();
 var syncProgress = SyncProgress();
 var prompt = Prompt();
 var bookmarkList = BookmarkList();
@@ -5126,21 +5160,31 @@ function App() {
   return {
     view() {
       const writeOnly = store.state.writeOnly;
-      return (0, import_mithril11.default)("div.app-inner", [
-        (0, import_mithril11.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
-        (0, import_mithril11.default)(authModal),
-        (0, import_mithril11.default)(helpModal),
-        writeOnly ? null : (0, import_mithril11.default)(syncProgress),
-        writeOnly ? null : (0, import_mithril11.default)(prompt),
-        writeOnly ? null : (0, import_mithril11.default)(bookmarkList),
-        (0, import_mithril11.default)(saveBar),
-        writeOnly ? null : (0, import_mithril11.default)(helpbar)
+      return (0, import_mithril12.default)("div.app-inner", [
+        (0, import_mithril12.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
+        (0, import_mithril12.default)(authModal),
+        (0, import_mithril12.default)(helpModal),
+        (0, import_mithril12.default)(errorModal),
+        writeOnly ? null : (0, import_mithril12.default)(syncProgress),
+        writeOnly ? null : (0, import_mithril12.default)(prompt),
+        writeOnly ? null : (0, import_mithril12.default)(bookmarkList),
+        (0, import_mithril12.default)(saveBar),
+        writeOnly ? null : (0, import_mithril12.default)(helpbar)
       ]);
     }
   };
 }
 
 // ts/index.ts
+window.addEventListener("error", (event) => {
+  store.setFatalError(event.message, event.error?.stack ?? "(no stack)");
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const err = event.reason;
+  const message = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
+  store.setFatalError(message, stack);
+});
 async function main() {
   const [token, hadAuthError] = await Promise.all([readToken(), readAuthError()]);
   if (token) {
@@ -5149,7 +5193,7 @@ async function main() {
     store.openAuthModal();
   }
   if (token && hadAuthError) store.openAuthModal();
-  import_mithril12.default.mount(document.getElementById("app"), App());
+  import_mithril13.default.mount(document.getElementById("app"), App());
   if (token && !hadAuthError) startSync(token).catch(console.error);
 }
 main().catch(console.error);

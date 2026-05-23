@@ -43,4 +43,5 @@ export type AppState = {
   syncStatus: SyncStatus;
   showAuthModal: boolean;
   showHelpModal: boolean;
+  fatalError: { message: string; stack: string } | null;
 };

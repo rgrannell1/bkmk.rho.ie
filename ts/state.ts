@@ -20,6 +20,7 @@ function initialState(): AppState {
     syncStatus:    { kind: "idle" },
     showAuthModal: false,
     showHelpModal: false,
+    fatalError:    null,
   };
 }
 
@@ -137,6 +138,11 @@ class Store {
 
   closeAuthModal(): void {
     applyAuthModal(this.#state, false);
+    m.redraw();
+  }
+
+  setFatalError(message: string, stack: string): void {
+    this.#state.fatalError = { message, stack };
     m.redraw();
   }
 

@@ -7,6 +7,17 @@ import { store } from "./state.ts";
 import { startSync } from "./boot.ts";
 import { App } from "./components/app.ts";
 
+window.addEventListener("error", (event) => {
+  store.setFatalError(event.message, event.error?.stack ?? "(no stack)");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const err = event.reason;
+  const message = err instanceof Error ? err.message : String(err);
+  const stack   = err instanceof Error ? (err.stack ?? "(no stack)") : "(no stack)";
+  store.setFatalError(message, stack);
+});
+
 async function main(): Promise<void> {
   const [token, hadAuthError] = await Promise.all([readToken(), readAuthError()]);
 

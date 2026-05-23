@@ -263,6 +263,21 @@ body {
   background: var(--accent);
   color: var(--bg);
 }
+.error-panel {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.error-message {
+  color: var(--accent);
+  font-size: 12px;
+}
+.error-stack {
+  color: var(--fg-dim);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0.5rem 0;
+}
 .help-table {
   border-collapse: collapse;
   width: 100%;
