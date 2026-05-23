@@ -15,6 +15,8 @@ import { runSearch } from "../search.ts";
 
 // Instantiated once — Mithril compares component identity by reference,
 // so re-calling factory functions on every render would unmount+remount each subtree.
+const BUILD_HASH = (document.getElementById("app") as HTMLElement).dataset.build ?? "";
+
 const authModal    = AuthModal();
 const helpModal    = HelpModal();
 const errorModal   = ErrorModal();
@@ -29,7 +31,10 @@ export function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return m("div.app-inner", [
-        m("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
+        m("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, [
+          "bkmk",
+          m("span.brand-hash", BUILD_HASH),
+        ]),
         m(authModal),
         m(helpModal),
         m(errorModal),

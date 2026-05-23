@@ -5148,6 +5148,7 @@ function ErrorModal() {
 }
 
 // ts/components/app.ts
+var BUILD_HASH = document.getElementById("app").dataset.build ?? "";
 var authModal = AuthModal();
 var helpModal = HelpModal();
 var errorModal = ErrorModal();
@@ -5161,7 +5162,10 @@ function App() {
     view() {
       const writeOnly = store.state.writeOnly;
       return (0, import_mithril12.default)("div.app-inner", [
-        (0, import_mithril12.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, "bkmk"),
+        (0, import_mithril12.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, [
+          "bkmk",
+          (0, import_mithril12.default)("span.brand-hash", BUILD_HASH)
+        ]),
         (0, import_mithril12.default)(authModal),
         (0, import_mithril12.default)(helpModal),
         (0, import_mithril12.default)(errorModal),

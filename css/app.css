@@ -55,6 +55,16 @@ html, body {
   user-select: none;
   flex-shrink: 0;
   cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.brand-hash {
+  color: var(--fg-dim);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: none;
 }
 
 /* ── Prompt ── */
