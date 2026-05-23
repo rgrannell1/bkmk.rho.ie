@@ -5,7 +5,7 @@ const CACHE = 'bkmk-dzmofncn'
 const APP_SHELL = [
   '/',
   '/js/app-DZMOFNCN.js',
-  '/css/app-GB5THKWI.css',
+  '/css/app-EJBJLBRO.css',
   '/manifest.json',
   '/icons/icon.svg',
 ]
