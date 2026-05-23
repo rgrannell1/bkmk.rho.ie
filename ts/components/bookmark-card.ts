@@ -4,7 +4,6 @@
 import m from "mithril";
 import { store } from "../state.ts";
 import { runSearch } from "../search.ts";
-import { isScrolling } from "../scroll-state.ts";
 import type { Bookmark } from "../types.ts";
 
 type CardAttrs = {
@@ -54,7 +53,6 @@ export function BookmarkCard() {
       return m("div", {
         class:        cardClass(idx, selected),
         onclick:      openUrl.bind(null, bookmark.url),
-        onmouseenter: () => { if (!isScrolling()) store.selectIdx(idx); },
       }, [
         m("span.card-cursor", selected ? ">" : " "),
         m("span.card-url", bookmark.title ?? displayUrl(bookmark.url)),

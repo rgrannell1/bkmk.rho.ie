@@ -3,7 +3,6 @@
 
 import m from "mithril";
 import { store } from "../state.ts";
-import { markScrolled } from "../scroll-state.ts";
 import { BookmarkCard } from "./bookmark-card.ts";
 import { DateDivider } from "./date-divider.ts";
 import type { Bookmark } from "../types.ts";
@@ -129,7 +128,6 @@ function onScroll(event: Event): void {
   const el = event.target as HTMLElement;
   scrollTop      = el.scrollTop;
   viewportHeight = el.clientHeight;
-  markScrolled();
   m.redraw();
 }
 
