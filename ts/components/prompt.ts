@@ -29,16 +29,21 @@ function handleFocusedKey(inputEl: HTMLInputElement, event: KeyboardEvent): void
 }
 
 function handleGlobalKey(inputEl: HTMLInputElement, event: KeyboardEvent): void {
-  // Modal open — let it handle Esc; swallow everything else
+  if (store.state.showHelpModal) {
+    if (event.key === "Escape") store.closeHelpModal();
+    return;
+  }
+  // Auth modal open — let it handle Esc; swallow everything else
   if (store.state.showAuthModal) {
     if (event.key === "Escape" && store.state.token) store.closeAuthModal();
     return;
   }
-  if (event.key === "/")                              { event.preventDefault(); inputEl.focus(); return; }
-  if (event.key === "ArrowDown") { store.moveSelection(1);  return; }
-  if (event.key === "ArrowUp")   { store.moveSelection(-1); return; }
-  if (event.key === "Enter")                            openSelected();
-  if (event.key === "a")                                store.openAuthModal();
+  if (event.key === "/")          { event.preventDefault(); inputEl.focus(); return; }
+  if (event.key === "ArrowDown")  { store.moveSelection(1);  return; }
+  if (event.key === "ArrowUp")    { store.moveSelection(-1); return; }
+  if (event.key === "Enter")        openSelected();
+  if (event.key === "a")            store.openAuthModal();
+  if (event.key === "?")            store.openHelpModal();
 }
 
 function handleKeydown(inputEl: HTMLInputElement, event: KeyboardEvent): void {

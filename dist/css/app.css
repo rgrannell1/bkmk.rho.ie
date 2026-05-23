@@ -262,6 +262,23 @@ body {
   background: var(--accent);
   color: var(--bg);
 }
+.help-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.help-token {
+  color: var(--accent);
+  font-size: 12px;
+  padding: 0.2rem 1rem 0.2rem 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.help-desc {
+  color: var(--fg-dim);
+  font-size: 11px;
+  padding: 0.2rem 0;
+  vertical-align: top;
+}
 .sync-progress {
   display: flex;
   flex-direction: column;

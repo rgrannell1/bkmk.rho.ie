@@ -18,6 +18,7 @@ function initialState(): AppState {
     selectedIdx:   0,
     syncStatus:    { kind: "idle" },
     showAuthModal: false,
+    showHelpModal: false,
   };
 }
 
@@ -134,6 +135,16 @@ class Store {
 
   closeAuthModal(): void {
     applyAuthModal(this.#state, false);
+    m.redraw();
+  }
+
+  openHelpModal(): void {
+    this.#state.showHelpModal = true;
+    m.redraw();
+  }
+
+  closeHelpModal(): void {
+    this.#state.showHelpModal = false;
     m.redraw();
   }
 

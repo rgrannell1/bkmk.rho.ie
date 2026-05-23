@@ -9,10 +9,12 @@ import { Prompt } from "./prompt.ts";
 import { BookmarkList } from "./bookmark-list.ts";
 import { Helpbar } from "./helpbar.ts";
 import { SaveBar } from "./save-bar.ts";
+import { HelpModal } from "./help-modal.ts";
 
 // Instantiated once — Mithril compares component identity by reference,
 // so re-calling factory functions on every render would unmount+remount each subtree.
 const authModal    = AuthModal();
+const helpModal    = HelpModal();
 const syncProgress = SyncProgress();
 const prompt       = Prompt();
 const bookmarkList = BookmarkList();
@@ -26,6 +28,7 @@ export function App() {
       return m("div.app-inner", [
         m("div.brand", "bkmk"),
         m(authModal),
+        m(helpModal),
         writeOnly ? null : m(syncProgress),
         writeOnly ? null : m(prompt),
         writeOnly ? null : m(bookmarkList),

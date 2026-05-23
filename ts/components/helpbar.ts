@@ -21,14 +21,12 @@ function Chip() {
 }
 
 const BINDINGS: ChipAttrs[] = [
-  { binding: "/",        label: "search"   },
-  { binding: "↑/↓",     label: "navigate" },
-  { binding: "↵",        label: "open"     },
-  { binding: "Esc",      label: "clear"    },
-  { binding: "a",        label: "reauth"   },
-  { binding: "tag:",     label: "filter"   },
-  { binding: "host:",    label: "host"     },
-  { binding: "date:",    label: "date"     },
+  { binding: "/",   label: "search"   },
+  { binding: "↑/↓", label: "navigate" },
+  { binding: "↵",   label: "open"     },
+  { binding: "Esc", label: "clear"    },
+  { binding: "a",   label: "reauth"   },
+  { binding: "?",   label: "help"     },
 ];
 
 export function Helpbar() {

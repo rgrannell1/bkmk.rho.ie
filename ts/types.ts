@@ -42,4 +42,5 @@ export type AppState = {
   selectedIdx: number;
   syncStatus: SyncStatus;
   showAuthModal: boolean;
+  showHelpModal: boolean;
 };
