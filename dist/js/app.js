@@ -2135,6 +2135,7 @@ var META_LAST_ID = "lastEventId";
 var META_AUTH_ERROR = "authError";
 var DIFF_BUCKET_SIZE = 100;
 var STREAM_IDLE_TIMEOUT_MS = 3e3;
+var POLL_INTERVAL_MS = 6e4;
 
 // ts/storage.ts
 async function openBkmkDB() {
@@ -4591,6 +4592,21 @@ async function startSync(token) {
   await runDiffSync(token);
   await writeAuthError(false);
 }
+var syncInProgress = false;
+async function pollOnce(token) {
+  if (syncInProgress) return;
+  syncInProgress = true;
+  try {
+    await runDiffSync(token);
+  } finally {
+    syncInProgress = false;
+  }
+}
+function startPollLoop(token) {
+  setInterval(() => {
+    pollOnce(token).catch(console.error);
+  }, POLL_INTERVAL_MS);
+}
 
 // ts/components/app.ts
 var import_mithril12 = __toESM(require_mithril(), 1);
@@ -4610,7 +4626,7 @@ async function submitToken(event) {
   await writeToken(token);
   store.setToken(token);
   tokenDraft = "";
-  startSync(token).catch((err) => {
+  startSync(token).then(() => startPollLoop(token)).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
     store.setFatalError(message, stack);
@@ -5203,7 +5219,7 @@ async function main() {
   }
   if (token && hadAuthError) store.openAuthModal();
   import_mithril13.default.mount(document.getElementById("app"), App());
-  if (token && !hadAuthError) startSync(token).catch((err) => {
+  if (token && !hadAuthError) startSync(token).then(() => startPollLoop(token)).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
     store.setFatalError(message, stack);

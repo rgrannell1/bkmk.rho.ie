@@ -4,7 +4,7 @@
 import m from "mithril";
 import { readToken, readAuthError } from "./storage.ts";
 import { store } from "./state.ts";
-import { startSync } from "./boot.ts";
+import { startSync, startPollLoop } from "./boot.ts";
 import { App } from "./components/app.ts";
 
 window.addEventListener("error", (event) => {
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
 
   m.mount(document.getElementById("app")!, App());
 
-  if (token && !hadAuthError) startSync(token).catch((err: unknown) => {
+  if (token && !hadAuthError) startSync(token).then(() => startPollLoop(token)).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack   = err instanceof Error ? (err.stack ?? "(no stack)") : "(no stack)";
     store.setFatalError(message, stack);

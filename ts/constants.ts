@@ -26,3 +26,6 @@ export const DIFF_BUCKET_SIZE = 100;
 // How long to wait with no new data before considering the NDJSON stream complete.
 // The server tails indefinitely; we abort once the event backlog is exhausted.
 export const STREAM_IDLE_TIMEOUT_MS = 3_000;
+
+// How often to poll the server for new events while the tab is open.
+export const POLL_INTERVAL_MS = 60_000;

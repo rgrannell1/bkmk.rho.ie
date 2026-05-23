@@ -7,6 +7,7 @@ import { replayEvents } from "./replay.ts";
 import { rebuildIndex, runSearch } from "./search.ts";
 import { store } from "./state.ts";
 import { readQueryParam } from "./url-state.ts";
+import { POLL_INTERVAL_MS } from "./constants.ts";
 
 function onSyncProgress(received: number): void {
   store.progressSync(received);
@@ -77,4 +78,22 @@ export async function startSync(token: string): Promise<void> {
   await replayAndReady();
   await runDiffSync(token);
   await writeAuthError(false);
+}
+
+// Shared lock — prevents concurrent diff syncs from overlapping.
+let syncInProgress = false;
+
+async function pollOnce(token: string): Promise<void> {
+  if (syncInProgress) return;
+  syncInProgress = true;
+  try {
+    await runDiffSync(token);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+// Starts a background poll loop that runs diffSync every POLL_INTERVAL_MS.
+export function startPollLoop(token: string): void {
+  setInterval(() => { pollOnce(token).catch(console.error); }, POLL_INTERVAL_MS);
 }
