@@ -15,7 +15,7 @@ async function buildBuckets(events: EventEntry[]): Promise<{ buckets: DiffBucket
   const bucketMap = new Map<number, EventEntry[]>();
 
   for (const event of events) {
-    const bucketStart = Math.floor((event.id - 1) / DIFF_BUCKET_SIZE) * DIFF_BUCKET_SIZE;
+    const bucketStart = Math.floor(event.id / DIFF_BUCKET_SIZE) * DIFF_BUCKET_SIZE;
     if (!bucketMap.has(bucketStart)) bucketMap.set(bucketStart, []);
     bucketMap.get(bucketStart)!.push(event);
   }
