@@ -31,6 +31,11 @@ export async function writeToken(token: string): Promise<void> {
 
 
 
+export async function readLastId(): Promise<number | null> {
+  const db = await openBkmkDB();
+  return (await db.get(STORE_META, META_LAST_ID) as number | undefined) ?? null;
+}
+
 export async function readAllEvents(): Promise<EventEntry[]> {
   const db = await openBkmkDB();
   return db.getAll(STORE_EVENTS);

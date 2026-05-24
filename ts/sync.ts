@@ -45,6 +45,7 @@ async function buildBuckets(events: EventEntry[]): Promise<{ buckets: DiffBucket
 // onProgress is called with the running total after each batch is flushed.
 export async function initialSync(
   token: string,
+  start?: number,
   onProgress?: (received: number) => void
 ): Promise<void> {
   const client = new CmstrClient({ url: CMSTR_URL, token });
@@ -63,7 +64,7 @@ export async function initialSync(
   resetIdleTimer();
 
   try {
-    for await (const event of client.streamEvents({ topic: BOOKMARKS_TOPIC, signal: controller.signal })) {
+    for await (const event of client.streamEvents({ topic: BOOKMARKS_TOPIC, start, signal: controller.signal })) {
       resetIdleTimer();
       batch.push(event);
 
@@ -133,7 +134,7 @@ export async function diffSync(token: string): Promise<EventEntry[]> {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ bucketSize: DIFF_BUCKET_SIZE, root, buckets }),
+    body: JSON.stringify({ root, buckets }),
   });
 
   // 204 = full match, nothing to fetch

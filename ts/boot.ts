@@ -1,7 +1,7 @@
 // Boot — sync orchestration called on initial load and after auth token is set
 // @work.md
 
-import { readAllEvents, writeAuthError } from "./storage.ts";
+import { readAllEvents, readLastId, writeAuthError } from "./storage.ts";
 import { initialSync, diffSync } from "./sync.ts";
 import { replayEvents } from "./replay.ts";
 import { rebuildIndex, runSearch } from "./search.ts";
@@ -22,10 +22,10 @@ function isAuthError(err: unknown): boolean {
   return message.includes("403") || message.includes("401");
 }
 
-async function runInitialSync(token: string): Promise<void> {
+async function runInitialSync(token: string, start?: number): Promise<void> {
   store.beginSync();
   try {
-    await initialSync(token, onSyncProgress);
+    await initialSync(token, start, onSyncProgress);
     store.endSync();
   } catch (err) {
     // Auth errors are handled by startSync — don't show UNAUTHORIZED here
@@ -59,9 +59,11 @@ async function runDiffSync(token: string): Promise<void> {
 // Safe to call without awaiting — all store mutations trigger redraws internally.
 export async function startSync(token: string): Promise<void> {
   const stored = await readAllEvents();
+  const lastId = await readLastId();
   if (stored.length === 0) {
     try {
-      await runInitialSync(token);
+      // Resume from saved cursor so reconnecting clients don't re-fetch the full history.
+      await runInitialSync(token, lastId ?? undefined);
     } catch (err) {
       if (isAuthError(err)) {
         // 403 on GET — assume write-only credentials; skip sync entirely.

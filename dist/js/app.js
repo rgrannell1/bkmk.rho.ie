@@ -2154,6 +2154,10 @@ async function writeToken(token) {
   const db = await openBkmkDB();
   await db.put(STORE_META, token, META_TOKEN);
 }
+async function readLastId() {
+  const db = await openBkmkDB();
+  return await db.get(STORE_META, META_LAST_ID) ?? null;
+}
 async function readAllEvents() {
   const db = await openBkmkDB();
   return db.getAll(STORE_EVENTS);
@@ -2496,8 +2500,14 @@ var CmstrClient = class {
   }
 };
 
-// ../../cmstr/src/api/storage/kv/hashing.ts
+// ../../cmstr/src/commons/constants.ts
+var TOMBSTONE_RETENTION_MS = 24 * 60 * 60 * 1e3;
+var METRICS_BUCKET_TTL_MS = 24 * 60 * 60 * 1e3;
 var SHA256_BYTES = 32;
+var MAX_REQUEST_BODY_BYTES = 128 * 1024;
+var IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1e3;
+
+// ../../cmstr/src/api/storage/kv/hashing.ts
 function hexToBytes(hex) {
   const buf = new Uint8Array(hex.length / 2);
   for (let idx = 0; idx < buf.length; idx++) {
@@ -2536,7 +2546,7 @@ async function buildBuckets(events) {
   const root = buckets.length === 0 ? await hashBucketRoot([]) : await hashBucketRoot(buckets.map((bucket) => bucket.hash));
   return { buckets, root };
 }
-async function initialSync(token, onProgress) {
+async function initialSync(token, start, onProgress) {
   const client = new CmstrClient({ url: CMSTR_URL, token });
   const controller = new AbortController();
   let idleTimer = null;
@@ -2548,7 +2558,7 @@ async function initialSync(token, onProgress) {
   let total = 0;
   resetIdleTimer();
   try {
-    for await (const event of client.streamEvents({ topic: BOOKMARKS_TOPIC, signal: controller.signal })) {
+    for await (const event of client.streamEvents({ topic: BOOKMARKS_TOPIC, start, signal: controller.signal })) {
       resetIdleTimer();
       batch.push(event);
       if (batch.length >= 500) {
@@ -2602,7 +2612,7 @@ async function diffSync(token) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ bucketSize: DIFF_BUCKET_SIZE, root, buckets })
+    body: JSON.stringify({ root, buckets })
   });
   if (response.status === 204) return [];
   if (!response.ok) throw new Error(`Diff failed: HTTP ${response.status}`);
@@ -4583,10 +4593,10 @@ function isAuthError(err) {
   const message = err instanceof Error ? err.message : String(err);
   return message.includes("403") || message.includes("401");
 }
-async function runInitialSync(token) {
+async function runInitialSync(token, start) {
   store.beginSync();
   try {
-    await initialSync(token, onSyncProgress);
+    await initialSync(token, start, onSyncProgress);
     store.endSync();
   } catch (err) {
     if (!isAuthError(err)) store.errorSync(syncErrorMessage(err));
@@ -4613,9 +4623,10 @@ async function runDiffSync(token) {
 }
 async function startSync(token) {
   const stored = await readAllEvents();
+  const lastId = await readLastId();
   if (stored.length === 0) {
     try {
-      await runInitialSync(token);
+      await runInitialSync(token, lastId ?? void 0);
     } catch (err) {
       if (isAuthError(err)) {
         await writeAuthError(true);
