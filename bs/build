@@ -6,6 +6,12 @@ import { readdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { createHash } from "crypto";
 
+// cmstr is a local dependency; if not present (e.g. CI), dist is pre-built.
+if (!existsSync("/home/rg/Code/cmstr")) {
+  console.log("cmstr not available; using pre-built dist");
+  process.exit(0);
+}
+
 const ALIAS = {
   "cmstr":           "/home/rg/Code/cmstr/clients/ts/mod.ts",
   "cmstr/hashing":   "/home/rg/Code/cmstr/src/core/hashing.ts",
