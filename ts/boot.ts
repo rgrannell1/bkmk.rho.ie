@@ -2,11 +2,11 @@
 // @work.md
 
 import { openDB } from "idb";
-import { IDBBackend } from "../vendor/cmstr/idb/index.ts";
-import { SetIntervalScheduler } from "../vendor/cmstr/idb/scheduler.ts";
-import { CommonStorageNode } from "../vendor/cmstr/node.ts";
-import { syncEventTopic } from "../vendor/cmstr/sync.ts";
-import type { ISyncBackend } from "../vendor/cmstr/backend.ts";
+import { IDBBackend } from "cmstr/idb";
+import { SetIntervalScheduler } from "cmstr/scheduler";
+import { CommonStorageNode } from "cmstr/node";
+import { syncEventTopic } from "cmstr/sync";
+import type { ISyncBackend } from "cmstr/backend";
 import { replayEvents } from "./replay.ts";
 import { rebuildIndex, runSearch } from "./search.ts";
 import { store } from "./state.ts";

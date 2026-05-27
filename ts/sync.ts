@@ -1,7 +1,7 @@
 // Sync facade — exposes postBookmark via the shared CommonStorageNode
 // @work.md
 
-import type { CommonStorageNode } from "../vendor/cmstr/node.ts";
+import type { CommonStorageNode } from "cmstr/node";
 import { BOOKMARKS_TOPIC } from "./constants.ts";
 
 let _node: CommonStorageNode | null = null;

@@ -2327,7 +2327,7 @@ replaceTraps((oldTraps) => ({
   }
 }));
 
-// vendor/cmstr/idb/events.ts
+// ../../cmstr/src/storage/idb/events.ts
 var IDB_EVENT_STORE = "events";
 function toEntry(stored) {
   return { id: stored.id, createdAt: stored.createdAt, updatedAt: stored.updatedAt, payload: stored.payload };
@@ -2418,7 +2418,7 @@ var IDBEventStore = class {
   }
 };
 
-// vendor/cmstr/idb/objects.ts
+// ../../cmstr/src/storage/idb/objects.ts
 var IDB_OBJECT_STORE = "objects";
 var IDB_OBJECT_SEQ_INDEX = "by-seq";
 function toEntry2(stored) {
@@ -2441,7 +2441,9 @@ var IDBObjectStore2 = class {
     let cursor = await index.openCursor(range);
     while (cursor) {
       if (opts.size !== void 0 && results.length >= opts.size) break;
-      results.push(toEntry2(cursor.value));
+      const stored = cursor.value;
+      if (stored.topic !== topic) break;
+      results.push(toEntry2(stored));
       cursor = await cursor.continue();
     }
     return results;
@@ -2513,7 +2515,7 @@ var IDBObjectStore2 = class {
   }
 };
 
-// vendor/cmstr/idb/cursors.ts
+// ../../cmstr/src/storage/idb/cursors.ts
 var IDB_CURSOR_STORE = "cursors";
 var IDBCursorStore = class {
   constructor(db) {
@@ -2540,9 +2542,20 @@ var IDBCursorStore = class {
   }
 };
 
-// vendor/cmstr/hashing.ts
+// ../../cmstr/src/commons/constants.ts
+var TAIL_DURATION_MS = 5e3;
+var DEFAULT_FETCH_PAGE_SIZE = 500;
+var MERKLE_LEAF_SIZE = 100;
+var MERKLE_TREE_END = MERKLE_LEAF_SIZE * (1 << 20);
+var MERKLE_TREE_DEPTH = 20;
+var TOMBSTONE_RETENTION_MS = 24 * 60 * 60 * 1e3;
+var METRICS_BUCKET_TTL_MS = 24 * 60 * 60 * 1e3;
 var UINT64_BYTES = 8;
 var SHA256_BYTES = 32;
+var MAX_REQUEST_BODY_BYTES = 128 * 1024;
+var IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1e3;
+
+// ../../cmstr/src/core/hashing.ts
 function hexToBytes(hex) {
   const buf = new Uint8Array(hex.length / 2);
   for (let idx = 0; idx < buf.length; idx++) {
@@ -2554,7 +2567,7 @@ async function sha256Hex(data) {
   const hash = await crypto.subtle.digest("SHA-256", data.buffer);
   return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-function hashEventBucket(entries) {
+function hashBucket(entries) {
   const buf = new Uint8Array(entries.length * UINT64_BYTES * 2);
   const view = new DataView(buf.buffer);
   for (let idx = 0; idx < entries.length; idx++) {
@@ -2563,7 +2576,6 @@ function hashEventBucket(entries) {
   }
   return sha256Hex(buf);
 }
-var hashBucket = hashEventBucket;
 function hashMerkleInternalNode(leftHash, rightHash) {
   const buf = new Uint8Array(SHA256_BYTES * 2);
   buf.set(hexToBytes(leftHash), 0);
@@ -2571,14 +2583,7 @@ function hashMerkleInternalNode(leftHash, rightHash) {
   return sha256Hex(buf);
 }
 
-// vendor/cmstr/constants.ts
-var TAIL_DURATION_MS = 5e3;
-var DEFAULT_FETCH_PAGE_SIZE = 500;
-var MERKLE_LEAF_SIZE = 100;
-var MERKLE_TREE_END = MERKLE_LEAF_SIZE * (1 << 20);
-var MERKLE_TREE_DEPTH = 20;
-
-// vendor/cmstr/diff.ts
+// ../../cmstr/src/core/diff.ts
 var emptyHashTablePromise = null;
 function getEmptyHashTable() {
   if (emptyHashTablePromise === null) {
@@ -2677,7 +2682,7 @@ function buildObjectMerkleTree(entries) {
   return new ClientMerkleTree(sorted, MERKLE_LEAF_SIZE);
 }
 
-// vendor/cmstr/idb/merkle.ts
+// ../../cmstr/src/storage/idb/merkle.ts
 var BoundMerkleTree = class {
   constructor(store2, topic) {
     this.store = store2;
@@ -2741,15 +2746,13 @@ var IDBMerkleStore = class {
       return emptyTable[Math.min(MERKLE_TREE_DEPTH, Math.max(0, depth))];
     }
     const mid = Math.floor((start + end) / 2);
-    const [leftHash, rightHash] = await Promise.all([
-      this.hashForRange(topic, start, mid),
-      this.hashForRange(topic, mid, end)
-    ]);
+    const leftHash = await this.hashForRange(topic, start, mid);
+    const rightHash = await this.hashForRange(topic, mid, end);
     return hashMerkleInternalNode(leftHash, rightHash);
   }
 };
 
-// vendor/cmstr/idb/index.ts
+// ../../cmstr/src/storage/idb/index.ts
 var IDB_VERSION = 3;
 var IDB_MERKLE_EVENT_STORE = "merkle-events";
 var IDB_MERKLE_OBJECT_STORE = "merkle-objects";
@@ -2808,13 +2811,13 @@ var IDBBackend = class _IDBBackend {
   }
 };
 
-// vendor/cmstr/idb/scheduler.ts
+// ../../cmstr/src/storage/idb/scheduler.ts
 var SetIntervalScheduler = class {
   handles = /* @__PURE__ */ new Map();
   schedule(id, intervalMs, fn) {
     if (this.handles.has(id)) return;
     const handle = setInterval(() => {
-      fn().catch((err) => console.error("[cmstr] scheduler error", err));
+      fn().catch((err) => console.error("[cmstr] unhandled scheduler error", err));
     }, intervalMs);
     this.handles.set(id, handle);
   }
@@ -2824,8 +2827,10 @@ var SetIntervalScheduler = class {
   }
 };
 
-// vendor/cmstr/sync.ts
+// ../../cmstr/src/api/commons/statuses.ts
 var STATUS_NO_CONTENT = 204;
+
+// ../../cmstr/src/core/sync.ts
 function authHeaders(token) {
   return { "Authorization": `Bearer ${token}` };
 }
@@ -2999,7 +3004,7 @@ async function syncObjectTopic(backend, baseUrl, token, topic) {
   return changes;
 }
 
-// vendor/cmstr/logger.ts
+// ../../cmstr/src/commons/logger.ts
 var NoopLogger = class {
   info(_message, _request, _data) {
   }
@@ -3007,7 +3012,7 @@ var NoopLogger = class {
   }
 };
 
-// vendor/cmstr/node.ts
+// ../../cmstr/src/core/node.ts
 var CommonStorageNode = class {
   backend;
   scheduler;
@@ -3022,6 +3027,7 @@ var CommonStorageNode = class {
     const objects = (subscriptions.objects ?? []).map((sub) => ({ topicType: "object", ...sub }));
     this.subscriptions = [...events, ...objects];
   }
+  // -- Lifecycle --
   start() {
     for (const sub of this.subscriptions) {
       this.scheduler.schedule(`cmstr-sync-${sub.topic}`, sub.intervalMs, () => this.sync(sub.topic));
@@ -3030,6 +3036,7 @@ var CommonStorageNode = class {
   stop() {
     this.scheduler.cancelAll();
   }
+  // -- Sync (also callable manually) --
   async sync(topic) {
     const sub = this.subscriptions.find((declared) => declared.topic === topic);
     if (!sub) return;
@@ -3041,16 +3048,17 @@ var CommonStorageNode = class {
       this.logger.error("sync failed", void 0, { topic, error: String(err) });
     }
   }
+  // -- Event topic reads --
   getEvent(topic, id) {
     return this.backend.events.readEvent(topic, id);
   }
   getEvents(topic, opts = {}) {
     return this.backend.events.readEvents(topic, opts);
   }
+  // -- Event topic writes (optimistic: local first, then push to remote) --
   async postEvent(topic, payload) {
     const entry = await this.backend.events.writeEvent(topic, payload);
     if (entry) {
-      await this.backend.merkleEvents?.invalidatePath(topic, entry.id);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushEvent(topic, "POST", payload);
     }
@@ -3059,38 +3067,37 @@ var CommonStorageNode = class {
   async putEvent(topic, id, payload) {
     const result = await this.backend.events.updateEvent(topic, id, payload);
     if (result) {
-      await this.backend.merkleEvents?.invalidatePath(topic, id);
       this.#emit({ type: "upsert", topic, entry: result.entry });
       await this.#pushEvent(topic, "PUT", payload, id);
     }
     return result?.entry ?? null;
   }
+  // -- Object topic reads --
   getObject(topic, id) {
     return this.backend.objects.readObject(topic, id);
   }
   getObjects(topic, opts = {}) {
     return this.backend.objects.readObjectsBySeq(topic, opts);
   }
+  // -- Object topic writes (optimistic: local first, then push to remote) --
   async putObject(topic, id, payload) {
-    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : void 0;
     const entry = await this.backend.objects.upsertObject(topic, id, payload);
     if (entry) {
-      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushObject(topic, id, "PUT", payload);
     }
     return entry;
   }
   async deleteObject(topic, id) {
-    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : void 0;
     const entry = await this.backend.objects.deleteObject(topic, id);
     if (entry) {
-      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "delete", topic, id });
       await this.#pushObject(topic, id, "DELETE");
     }
     return entry;
   }
+  // -- Change observation --
+  // Async generator that yields ChangeEvents as they are emitted by writes and incoming sync.
   async *watch(topic) {
     const queue = [];
     let resolve = null;
@@ -3116,6 +3123,7 @@ var CommonStorageNode = class {
       }
     }
   }
+  // -- Internal --
   #emit(event) {
     const handlers = this.watchers.get(event.topic) ?? [];
     for (const handler of handlers) handler(event);

@@ -7,8 +7,13 @@ import { join } from "path";
 import { createHash } from "crypto";
 
 const ALIAS = {
-  "cmstr":         "./vendor/cmstr/mod.ts",
-  "cmstr/hashing": "./vendor/cmstr/hashing.ts",
+  "cmstr":           "/home/rg/Code/cmstr/clients/ts/mod.ts",
+  "cmstr/hashing":   "/home/rg/Code/cmstr/src/core/hashing.ts",
+  "cmstr/idb":       "/home/rg/Code/cmstr/src/storage/idb/index.ts",
+  "cmstr/scheduler": "/home/rg/Code/cmstr/src/storage/idb/scheduler.ts",
+  "cmstr/node":      "/home/rg/Code/cmstr/src/core/node.ts",
+  "cmstr/sync":      "/home/rg/Code/cmstr/src/core/sync.ts",
+  "cmstr/backend":   "/home/rg/Code/cmstr/src/storage/backend.ts",
 };
 
 function cleanStale() {
@@ -119,6 +124,7 @@ async function build() {
       sourcemap: true,
       platform: "browser",
       target: "es2022",
+      nodePaths: [new URL("../node_modules", import.meta.url).pathname],
       alias: ALIAS,
       tsconfig: "tsconfig.json",
       metafile: true,
