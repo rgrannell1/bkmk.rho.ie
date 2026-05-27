@@ -5800,10 +5800,12 @@ function closeOnBackdropClick(event) {
     store.closeHelpModal();
   }
 }
+var MOBILE_MAX_WIDTH_PX = 768;
 function HelpModal() {
   return {
     view() {
       if (!store.state.showHelpModal) return null;
+      if (window.innerWidth <= MOBILE_MAX_WIDTH_PX) return null;
       return (0, import_mithril10.default)("div.modal-backdrop", { onclick: closeOnBackdropClick }, [
         (0, import_mithril10.default)("div.modal-panel", [
           (0, import_mithril10.default)("button.modal-close", { onclick: store.closeHelpModal.bind(store) }, "\xD7"),

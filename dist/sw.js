@@ -1,10 +1,10 @@
 // Service worker — network-first; cache is offline fallback only.
 
-const CACHE = 'bkmk-a62d7b02'
+const CACHE = 'bkmk-50c48d13'
 
 const APP_SHELL = [
   '/',
-  '/js/app-U6OHTYMN.js',
+  '/js/app-23PZB5GE.js',
   '/css/app-EJBJLBRO.css',
   '/manifest.json',
   '/icons/icon.svg',

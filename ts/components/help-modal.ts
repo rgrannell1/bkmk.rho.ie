@@ -22,10 +22,14 @@ function closeOnBackdropClick(event: MouseEvent): void {
   }
 }
 
+// Viewport width below which the help modal is suppressed — matches the mobile CSS breakpoint
+const MOBILE_MAX_WIDTH_PX = 768;
+
 export function HelpModal() {
   return {
     view() {
       if (!store.state.showHelpModal) return null;
+      if (window.innerWidth <= MOBILE_MAX_WIDTH_PX) return null;
       return m("div.modal-backdrop", { onclick: closeOnBackdropClick }, [
         m("div.modal-panel", [
           m("button.modal-close", { onclick: store.closeHelpModal.bind(store) }, "×"),
