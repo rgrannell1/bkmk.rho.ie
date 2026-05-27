@@ -509,3 +509,10 @@ kbd {
   color: var(--fg-dim);
   font-size: 11px;
 }
+
+/* ── Mobile ── */
+
+@media (max-width: 768px) {
+  .helpbar { display: none; }
+  .save-bar--raised { bottom: 0; }
+}
