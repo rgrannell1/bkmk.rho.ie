@@ -1,7 +1,51 @@
 #!/usr/bin/env node
-// Watch mode — rebuilds JS and CSS on any source change
+// Watch mode — rebuilds JS and CSS on any source change, serves from project root
 
 import * as esbuild from "esbuild";
+import { createServer } from "http";
+import { createReadStream, existsSync } from "fs";
+import { extname, join } from "path";
+
+const PORT = Number(process.env.PORT ?? 3000);
+
+const MIME = {
+  ".html": "text/html",
+  ".js":   "application/javascript",
+  ".css":  "text/css",
+  ".json": "application/json",
+  ".svg":  "image/svg+xml",
+  ".png":  "image/png",
+  ".webmanifest": "application/manifest+json",
+};
+
+function serve(port) {
+  const server = createServer((req, res) => {
+    const url  = req.url ?? "/";
+    const path = url === "/" ? "/index.html" : url;
+    const file = join(".", path);
+
+    if (!existsSync(file)) {
+      res.writeHead(404);
+      res.end("not found");
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": MIME[extname(file)] ?? "application/octet-stream" });
+    createReadStream(file).pipe(res);
+  });
+
+  server.on("error", err => {
+    if (err.code === "EADDRINUSE") {
+      serve(port + 1);
+    } else {
+      throw err;
+    }
+  });
+
+  server.listen(port, () => {
+    console.log(`watching…  http://localhost:${port}`);
+  });
+}
 
 const shared = {
   bundle: true,
@@ -30,4 +74,4 @@ const [jsCtx, cssCtx] = await Promise.all([
 ]);
 
 await Promise.all([jsCtx.watch(), cssCtx.watch()]);
-console.log("watching…");
+serve(PORT);

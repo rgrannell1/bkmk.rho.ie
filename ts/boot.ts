@@ -1,41 +1,56 @@
-// Boot — sync orchestration called on initial load and after auth token is set
+// Boot — creates CommonStorageNode, migrates old IDB, runs initial sync, starts background polling
 // @work.md
 
-import { readAllEvents, readLastId, writeAuthError } from "./storage.ts";
-import { initialSync, diffSync } from "./sync.ts";
+import { openDB } from "idb";
+import { IDBBackend } from "../vendor/cmstr/idb/index.ts";
+import { SetIntervalScheduler } from "../vendor/cmstr/idb/scheduler.ts";
+import { CommonStorageNode } from "../vendor/cmstr/node.ts";
+import { syncEventTopic } from "../vendor/cmstr/sync.ts";
+import type { ISyncBackend } from "../vendor/cmstr/backend.ts";
 import { replayEvents } from "./replay.ts";
 import { rebuildIndex, runSearch } from "./search.ts";
 import { store } from "./state.ts";
 import { readQueryParam } from "./url-state.ts";
-import { POLL_INTERVAL_MS } from "./constants.ts";
-
-function onSyncProgress(received: number): void {
-  store.progressSync(received);
-}
-
-function syncErrorMessage(_err: unknown): string {
-  return "SYNC ERROR";
-}
+import { writeAuthError } from "./storage.ts";
+import { setNode } from "./sync.ts";
+import { CMSTR_URL, BOOKMARKS_TOPIC, POLL_INTERVAL_MS, CMSTR_IDB_NAME } from "./constants.ts";
+import type { EventEntry } from "./types.ts";
 
 function isAuthError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
   return message.includes("403") || message.includes("401");
 }
 
-async function runInitialSync(token: string, start?: number): Promise<void> {
-  store.beginSync();
-  try {
-    await initialSync(token, start, onSyncProgress);
-    store.endSync();
-  } catch (err) {
-    // Auth errors are handled by startSync — don't show UNAUTHORIZED here
-    if (!isAuthError(err)) store.errorSync(syncErrorMessage(err));
-    throw err;
+// Migrates events from the old bkmk IDB (keyPath-based schema) into the new cmstr IDB backend.
+// Idempotent: does nothing if the old DB is absent or has already been migrated.
+async function migrateOldIDB(backend: IDBBackend): Promise<void> {
+  const databases = await indexedDB.databases();
+  if (!databases.some(db => db.name === "bkmk")) return;
+
+  const oldDb = await openDB("bkmk", 1);
+  const events = await oldDb.getAll("events") as EventEntry[];
+  oldDb.close();
+
+  if (events.length === 0) {
+    indexedDB.deleteDatabase("bkmk");
+    return;
   }
+
+  let maxId = 0;
+  for (const event of events) {
+    await backend.events.updateEvent(BOOKMARKS_TOPIC, event.id, event.payload, {
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+    });
+    maxId = Math.max(maxId, event.id);
+  }
+  if (maxId > 0) await backend.cursors.setEventCursor(BOOKMARKS_TOPIC, maxId);
+
+  indexedDB.deleteDatabase("bkmk");
 }
 
-async function replayAndReady(): Promise<void> {
-  const events = await readAllEvents();
+async function replayAndReady(backend: ISyncBackend): Promise<void> {
+  const events = await backend.events.readEvents(BOOKMARKS_TOPIC, {}) ?? [];
   const bookmarks = replayEvents(events);
   rebuildIndex(bookmarks);
   const query = readQueryParam();
@@ -44,60 +59,74 @@ async function replayAndReady(): Promise<void> {
   if (query) store.setQuery(query, results);
 }
 
-async function runDiffSync(token: string): Promise<void> {
-  const newEvents = await diffSync(token);
-  if (newEvents.length === 0) return;
+// Debounced replay triggered by incoming sync change events.
+// Batches rapid-fire events from a single sync cycle into one replay pass.
+function startWatchLoop(node: CommonStorageNode, backend: ISyncBackend): void {
+  let replayTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const events = await readAllEvents();
-  const bookmarks = replayEvents(events);
-  rebuildIndex(bookmarks);
-  const results = runSearch(store.state.query, bookmarks);
-  store.applyDiff(bookmarks, results);
+  (async () => {
+    for await (const _change of node.watch(BOOKMARKS_TOPIC)) {
+      if (replayTimer !== null) clearTimeout(replayTimer);
+      replayTimer = setTimeout(async () => {
+        replayTimer = null;
+        store.beginPoll();
+        const events = await backend.events.readEvents(BOOKMARKS_TOPIC, {}) ?? [];
+        const bookmarks = replayEvents(events);
+        rebuildIndex(bookmarks);
+        const results = runSearch(store.state.query, bookmarks);
+        store.applyDiff(bookmarks, results);
+        store.pollComplete();
+      }, 100);
+    }
+  })().catch(console.error);
 }
 
 // Orchestrates the full sync lifecycle for a given token.
 // Safe to call without awaiting — all store mutations trigger redraws internally.
 export async function startSync(token: string): Promise<void> {
-  const stored = await readAllEvents();
-  const lastId = await readLastId();
-  if (stored.length === 0) {
-    try {
-      // Resume from saved cursor so reconnecting clients don't re-fetch the full history.
-      await runInitialSync(token, lastId ?? undefined);
-    } catch (err) {
-      if (isAuthError(err)) {
-        // 403 on GET — assume write-only credentials; skip sync entirely.
-        await writeAuthError(true);
-        store.setWriteOnly(true);
-        store.endSync();
-        return;
-      }
-      // Non-auth error — rethrow so the caller's error handler can surface it.
-      throw err;
-    }
-  }
+  const backend = await IDBBackend.open(CMSTR_IDB_NAME);
+  await migrateOldIDB(backend);
 
-  await replayAndReady();
-  await runDiffSync(token);
-  await writeAuthError(false);
-}
+  const scheduler = new SetIntervalScheduler();
+  const node = new CommonStorageNode(
+    { backend, scheduler },
+    {
+      events: [{
+        topic: BOOKMARKS_TOPIC,
+        remoteUrl: CMSTR_URL,
+        token,
+        intervalMs: POLL_INTERVAL_MS,
+      }],
+    },
+  );
+  setNode(node);
 
-// Shared lock — prevents concurrent diff syncs from overlapping.
-let syncInProgress = false;
+  store.beginSync();
 
-async function pollOnce(token: string): Promise<void> {
-  if (syncInProgress) return;
-  syncInProgress = true;
-  store.beginPoll();
   try {
-    await runDiffSync(token);
-    store.pollComplete();
-  } finally {
-    syncInProgress = false;
+    await syncEventTopic(
+      backend,
+      CMSTR_URL,
+      token,
+      BOOKMARKS_TOPIC,
+      undefined,
+      count => store.progressSync(count),
+    );
+  } catch (err) {
+    if (isAuthError(err)) {
+      writeAuthError(true);
+      store.setWriteOnly(true);
+      store.endSync();
+      return;
+    }
+    store.errorSync("SYNC ERROR");
+    throw err;
   }
-}
 
-// Starts a background poll loop that runs diffSync every POLL_INTERVAL_MS.
-export function startPollLoop(token: string): void {
-  setInterval(() => { pollOnce(token).catch(console.error); }, POLL_INTERVAL_MS);
+  await replayAndReady(backend);
+  store.endSync();
+  writeAuthError(false);
+
+  startWatchLoop(node, backend);
+  node.start();
 }

@@ -1,72 +1,42 @@
-// IDB persistence — token, event log, and sync cursor via Jake Archibald's idb library
+// Auth state — token, auth-error flag, and permissions via localStorage
 // @work.md
 
-import { openDB, type IDBPDatabase } from "idb";
-import { IDB_NAME, STORE_EVENTS, STORE_META, META_TOKEN, META_LAST_ID, META_AUTH_ERROR } from "./constants.ts";
-import type { EventEntry } from "./types.ts";
+import type { Permissions } from "./auth.ts";
 
-type BkmkDB = IDBPDatabase<{
-  [STORE_EVENTS]: { key: number; value: EventEntry };
-  [STORE_META]:   { key: string; value: unknown };
-}>;
+const KEY_TOKEN       = "bkmk:token";
+const KEY_AUTH_ERROR  = "bkmk:authError";
+const KEY_PERMISSIONS = "bkmk:permissions";
 
-async function openBkmkDB(): Promise<BkmkDB> {
-  return openDB(IDB_NAME, 1, {
-    upgrade(db) {
-      db.createObjectStore(STORE_EVENTS, { keyPath: "id" });
-      db.createObjectStore(STORE_META);
-    },
-  });
+export function readToken(): string | null {
+  return localStorage.getItem(KEY_TOKEN);
 }
 
-export async function readToken(): Promise<string | null> {
-  const db = await openBkmkDB();
-  return (await db.get(STORE_META, META_TOKEN) as string | undefined) ?? null;
+export function writeToken(token: string): void {
+  localStorage.setItem(KEY_TOKEN, token);
 }
 
-export async function writeToken(token: string): Promise<void> {
-  const db = await openBkmkDB();
-  await db.put(STORE_META, token, META_TOKEN);
+export function readAuthError(): boolean {
+  return localStorage.getItem(KEY_AUTH_ERROR) === "true";
 }
 
-
-
-export async function readLastId(): Promise<number | null> {
-  const db = await openBkmkDB();
-  return (await db.get(STORE_META, META_LAST_ID) as number | undefined) ?? null;
+export function writeAuthError(flag: boolean): void {
+  if (flag) {
+    localStorage.setItem(KEY_AUTH_ERROR, "true");
+  } else {
+    localStorage.removeItem(KEY_AUTH_ERROR);
+  }
 }
 
-export async function readAllEvents(): Promise<EventEntry[]> {
-  const db = await openBkmkDB();
-  return db.getAll(STORE_EVENTS);
+export function readPermissions(): Permissions | null {
+  const raw = localStorage.getItem(KEY_PERMISSIONS);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Permissions;
+  } catch {
+    return null;
+  }
 }
 
-// Appends new events and advances the stored cursor in a single transaction.
-export async function appendEvents(events: EventEntry[]): Promise<void> {
-  if (events.length === 0) return;
-  const db = await openBkmkDB();
-  const tx = db.transaction([STORE_EVENTS, STORE_META], "readwrite");
-  await Promise.all(events.map(event => tx.objectStore(STORE_EVENTS).put(event)));
-  const maxId = events.reduce((max, event) => Math.max(max, event.id), 0);
-  await tx.objectStore(STORE_META).put(maxId, META_LAST_ID);
-  await tx.done;
+export function writePermissions(permissions: Permissions): void {
+  localStorage.setItem(KEY_PERMISSIONS, JSON.stringify(permissions));
 }
-
-export async function readAuthError(): Promise<boolean> {
-  const db = await openBkmkDB();
-  return (await db.get(STORE_META, META_AUTH_ERROR) as boolean | undefined) ?? false;
-}
-
-export async function writeAuthError(flag: boolean): Promise<void> {
-  const db = await openBkmkDB();
-  await db.put(STORE_META, flag, META_AUTH_ERROR);
-}
-
-export async function clearEvents(): Promise<void> {
-  const db = await openBkmkDB();
-  const tx = db.transaction([STORE_EVENTS, STORE_META], "readwrite");
-  await tx.objectStore(STORE_EVENTS).clear();
-  await tx.objectStore(STORE_META).delete(META_LAST_ID);
-  await tx.done;
-}
-

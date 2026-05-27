@@ -40,11 +40,13 @@ export function hashEventBucket(entries: Array<{ id: number; updatedAt: number }
   return sha256Hex(buf);
 }
 
-// SHA-256 over concatenated bucket hashes (32 bytes each) in order; used for the event diff root hash.
-export function hashBucketRoot(bucketHashes: string[]): Promise<string> {
-  const buf = new Uint8Array(bucketHashes.length * SHA256_BYTES);
-  for (let idx = 0; idx < bucketHashes.length; idx++) {
-    buf.set(hexToBytes(bucketHashes[idx]), idx * SHA256_BYTES);
-  }
+// SHA-256 over concatenated id||updatedAt pairs — generic alias used by IDB and diff modules.
+export const hashBucket = hashEventBucket;
+
+// SHA-256 of left || right child hashes (32 bytes each); used for internal Merkle tree nodes.
+export function hashMerkleInternalNode(leftHash: string, rightHash: string): Promise<string> {
+  const buf = new Uint8Array(SHA256_BYTES * 2);
+  buf.set(hexToBytes(leftHash), 0);
+  buf.set(hexToBytes(rightHash), SHA256_BYTES);
   return sha256Hex(buf);
 }

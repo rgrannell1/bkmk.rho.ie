@@ -3,11 +3,13 @@
 
 import m from "mithril";
 import { store } from "../state.ts";
-import { writeToken } from "../storage.ts";
-import { startSync, startPollLoop } from "../boot.ts";
+import { writeToken, writePermissions } from "../storage.ts";
+import { startSync } from "../boot.ts";
+import { parsePermissions } from "../auth.ts";
 
 // Draft token held at module level — survives re-renders, reset on successful submit.
-let tokenDraft = "";
+let tokenDraft     = "";
+let permissionError = "";
 
 // -- Handlers --
 
@@ -21,10 +23,21 @@ async function submitToken(event: Event): Promise<void> {
   const input = form.querySelector("input") as HTMLInputElement;
   const token = (input?.value ?? tokenDraft).trim();
   if (!token) return;
+
+  const permissions = parsePermissions(token);
+  if (permissions === null) {
+    permissionError = "token does not cover the bookmark topic";
+    m.redraw();
+    return;
+  }
+
+  permissionError = "";
+  writePermissions(permissions);
+  store.setPermissions(permissions);
   await writeToken(token);
   store.setToken(token);
   tokenDraft = "";
-  startSync(token).then(() => startPollLoop(token)).catch((err: unknown) => {
+  startSync(token).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack   = err instanceof Error ? (err.stack ?? "(no stack)") : "(no stack)";
     store.setFatalError(message, stack);
@@ -77,6 +90,9 @@ export function AuthModal() {
                 (vnode.dom as HTMLInputElement).focus();
               },
             }),
+            permissionError
+              ? m("p.modal-error", permissionError)
+              : null,
             m("button.modal-submit[type=submit]", "CONNECT"),
           ]),
         ]),

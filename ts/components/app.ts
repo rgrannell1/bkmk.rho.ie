@@ -29,7 +29,11 @@ const saveBar      = SaveBar();
 export function App() {
   return {
     view() {
-      const writeOnly = store.state.writeOnly;
+      const { writeOnly, permissions } = store.state;
+      // writeOnly: server rejected the token at sync time
+      // permissions: caveat-level access derived from the token at registration time
+      const canRead  = !writeOnly && (permissions?.canRead  ?? true);
+      const canWrite = permissions?.canWrite ?? true;
       return m("div.app-inner", [
         m("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, [
           "bkmk",
@@ -38,11 +42,11 @@ export function App() {
         m(authModal),
         m(helpModal),
         m(errorModal),
-        writeOnly ? null : m(syncProgress),
-        writeOnly ? null : m(prompt),
-        writeOnly ? null : m(bookmarkList),
-        m(saveBar),
-        writeOnly ? null : m(helpbar),
+        canRead ? m(syncProgress) : null,
+        canRead ? m(prompt)       : null,
+        canRead ? m(bookmarkList) : null,
+        canWrite ? m(saveBar)     : null,
+        canRead ? m(helpbar)      : null,
       ]);
     },
   };

@@ -1889,6 +1889,191 @@ var require_dayjs_min = __commonJS({
 // ts/index.ts
 var import_mithril13 = __toESM(require_mithril(), 1);
 
+// ts/storage.ts
+var KEY_TOKEN = "bkmk:token";
+var KEY_AUTH_ERROR = "bkmk:authError";
+function readToken() {
+  return localStorage.getItem(KEY_TOKEN);
+}
+function writeToken(token) {
+  localStorage.setItem(KEY_TOKEN, token);
+}
+function readAuthError() {
+  return localStorage.getItem(KEY_AUTH_ERROR) === "true";
+}
+function writeAuthError(flag) {
+  if (flag) {
+    localStorage.setItem(KEY_AUTH_ERROR, "true");
+  } else {
+    localStorage.removeItem(KEY_AUTH_ERROR);
+  }
+}
+
+// ts/state.ts
+var import_mithril = __toESM(require_mithril(), 1);
+
+// ts/url-state.ts
+var QUERY_PARAM = "q";
+function readQueryParam() {
+  return new URLSearchParams(window.location.search).get(QUERY_PARAM) ?? "";
+}
+function writeQueryParam(query) {
+  const params = new URLSearchParams(window.location.search);
+  if (query) {
+    params.set(QUERY_PARAM, query);
+  } else {
+    params.delete(QUERY_PARAM);
+  }
+  const newUrl = params.toString() ? `?${params}` : window.location.pathname;
+  history.replaceState(null, "", newUrl);
+}
+
+// ts/state.ts
+function initialState() {
+  return {
+    token: null,
+    ready: false,
+    writeOnly: false,
+    bookmarks: /* @__PURE__ */ new Map(),
+    urlSet: /* @__PURE__ */ new Set(),
+    query: "",
+    results: [],
+    selectedIdx: 0,
+    syncStatus: { kind: "idle" },
+    showAuthModal: false,
+    showHelpModal: false,
+    fatalError: null
+  };
+}
+function applyToken(state, token) {
+  state.token = token;
+  state.showAuthModal = token === null;
+}
+function buildUrlSet(bookmarks) {
+  return new Set([...bookmarks.values()].map((bookmark) => bookmark.url));
+}
+function applyReady(state, bookmarks, results) {
+  state.bookmarks = bookmarks;
+  state.urlSet = buildUrlSet(bookmarks);
+  state.results = results;
+  state.selectedIdx = 0;
+  state.ready = true;
+}
+function applyQuery(state, query, results) {
+  state.query = query;
+  state.results = results;
+  state.selectedIdx = 0;
+}
+function applySelection(state, delta) {
+  const next = state.selectedIdx + delta;
+  const max = state.results.length - 1;
+  state.selectedIdx = Math.max(0, Math.min(next, max));
+}
+function applySelectedIdx(state, idx) {
+  const max = state.results.length - 1;
+  state.selectedIdx = Math.max(0, Math.min(idx, max));
+}
+function applySyncStatus(state, status) {
+  state.syncStatus = status;
+}
+function applyAuthModal(state, visible) {
+  state.showAuthModal = visible;
+}
+function applyDiff(state, bookmarks, results) {
+  state.bookmarks = bookmarks;
+  state.urlSet = buildUrlSet(bookmarks);
+  state.results = results;
+}
+var Store = class {
+  #state = initialState();
+  get state() {
+    return this.#state;
+  }
+  setToken(token) {
+    applyToken(this.#state, token);
+    import_mithril.default.redraw();
+  }
+  setReady(bookmarks, results) {
+    applyReady(this.#state, bookmarks, results);
+    import_mithril.default.redraw();
+  }
+  setQuery(query, results) {
+    applyQuery(this.#state, query, results);
+    writeQueryParam(query);
+    import_mithril.default.redraw();
+  }
+  moveSelection(delta) {
+    applySelection(this.#state, delta);
+    import_mithril.default.redraw();
+  }
+  selectIdx(idx) {
+    applySelectedIdx(this.#state, idx);
+    import_mithril.default.redraw();
+  }
+  beginSync() {
+    applySyncStatus(this.#state, { kind: "syncing", received: 0 });
+    import_mithril.default.redraw();
+  }
+  progressSync(received) {
+    applySyncStatus(this.#state, { kind: "syncing", received });
+    import_mithril.default.redraw();
+  }
+  endSync() {
+    applySyncStatus(this.#state, { kind: "done" });
+    import_mithril.default.redraw();
+  }
+  beginPoll() {
+    applySyncStatus(this.#state, { kind: "polling" });
+    import_mithril.default.redraw();
+  }
+  pollComplete() {
+    applySyncStatus(this.#state, { kind: "upToDate" });
+    import_mithril.default.redraw();
+    setTimeout(() => {
+      if (this.#state.syncStatus.kind === "upToDate") {
+        applySyncStatus(this.#state, { kind: "idle" });
+        import_mithril.default.redraw();
+      }
+    }, 3e3);
+  }
+  errorSync(message) {
+    applySyncStatus(this.#state, { kind: "error", message });
+    import_mithril.default.redraw();
+  }
+  openAuthModal() {
+    applyAuthModal(this.#state, true);
+    import_mithril.default.redraw();
+  }
+  closeAuthModal() {
+    applyAuthModal(this.#state, false);
+    import_mithril.default.redraw();
+  }
+  setFatalError(message, stack) {
+    this.#state.fatalError = { message, stack };
+    import_mithril.default.redraw();
+  }
+  openHelpModal() {
+    this.#state.showHelpModal = true;
+    import_mithril.default.redraw();
+  }
+  closeHelpModal() {
+    this.#state.showHelpModal = false;
+    import_mithril.default.redraw();
+  }
+  applyDiff(bookmarks, results) {
+    applyDiff(this.#state, bookmarks, results);
+    import_mithril.default.redraw();
+  }
+  setWriteOnly(value) {
+    this.#state.writeOnly = value;
+    import_mithril.default.redraw();
+  }
+  urlExists(url) {
+    return this.#state.urlSet.has(url);
+  }
+};
+var store = new Store();
+
 // node_modules/idb/build/index.js
 var instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
 var idbProxyableTypes;
@@ -2124,390 +2309,9 @@ replaceTraps((oldTraps) => ({
   }
 }));
 
-// ts/constants.ts
-var CMSTR_URL = "https://cs.rho.ie";
-var BOOKMARKS_TOPIC = "bookmark";
-var IDB_NAME = "bkmk";
-var STORE_EVENTS = "events";
-var STORE_META = "meta";
-var META_TOKEN = "token";
-var META_LAST_ID = "lastEventId";
-var META_AUTH_ERROR = "authError";
-var DIFF_BUCKET_SIZE = 100;
-var STREAM_IDLE_TIMEOUT_MS = 3e3;
-var POLL_INTERVAL_MS = 6e4;
-
-// ts/storage.ts
-async function openBkmkDB() {
-  return openDB(IDB_NAME, 1, {
-    upgrade(db) {
-      db.createObjectStore(STORE_EVENTS, { keyPath: "id" });
-      db.createObjectStore(STORE_META);
-    }
-  });
-}
-async function readToken() {
-  const db = await openBkmkDB();
-  return await db.get(STORE_META, META_TOKEN) ?? null;
-}
-async function writeToken(token) {
-  const db = await openBkmkDB();
-  await db.put(STORE_META, token, META_TOKEN);
-}
-async function readLastId() {
-  const db = await openBkmkDB();
-  return await db.get(STORE_META, META_LAST_ID) ?? null;
-}
-async function readAllEvents() {
-  const db = await openBkmkDB();
-  return db.getAll(STORE_EVENTS);
-}
-async function appendEvents(events) {
-  if (events.length === 0) return;
-  const db = await openBkmkDB();
-  const tx = db.transaction([STORE_EVENTS, STORE_META], "readwrite");
-  await Promise.all(events.map((event) => tx.objectStore(STORE_EVENTS).put(event)));
-  const maxId = events.reduce((max, event) => Math.max(max, event.id), 0);
-  await tx.objectStore(STORE_META).put(maxId, META_LAST_ID);
-  await tx.done;
-}
-async function readAuthError() {
-  const db = await openBkmkDB();
-  return await db.get(STORE_META, META_AUTH_ERROR) ?? false;
-}
-async function writeAuthError(flag) {
-  const db = await openBkmkDB();
-  await db.put(STORE_META, flag, META_AUTH_ERROR);
-}
-
-// ts/state.ts
-var import_mithril = __toESM(require_mithril(), 1);
-
-// ts/url-state.ts
-var QUERY_PARAM = "q";
-function readQueryParam() {
-  return new URLSearchParams(window.location.search).get(QUERY_PARAM) ?? "";
-}
-function writeQueryParam(query) {
-  const params = new URLSearchParams(window.location.search);
-  if (query) {
-    params.set(QUERY_PARAM, query);
-  } else {
-    params.delete(QUERY_PARAM);
-  }
-  const newUrl = params.toString() ? `?${params}` : window.location.pathname;
-  history.replaceState(null, "", newUrl);
-}
-
-// ts/state.ts
-function initialState() {
-  return {
-    token: null,
-    ready: false,
-    writeOnly: false,
-    bookmarks: /* @__PURE__ */ new Map(),
-    urlSet: /* @__PURE__ */ new Set(),
-    query: "",
-    results: [],
-    selectedIdx: 0,
-    syncStatus: { kind: "idle" },
-    showAuthModal: false,
-    showHelpModal: false,
-    fatalError: null
-  };
-}
-function applyToken(state, token) {
-  state.token = token;
-  state.showAuthModal = token === null;
-}
-function buildUrlSet(bookmarks) {
-  return new Set([...bookmarks.values()].map((bookmark) => bookmark.url));
-}
-function applyReady(state, bookmarks, results) {
-  state.bookmarks = bookmarks;
-  state.urlSet = buildUrlSet(bookmarks);
-  state.results = results;
-  state.selectedIdx = 0;
-  state.ready = true;
-}
-function applyQuery(state, query, results) {
-  state.query = query;
-  state.results = results;
-  state.selectedIdx = 0;
-}
-function applySelection(state, delta) {
-  const next = state.selectedIdx + delta;
-  const max = state.results.length - 1;
-  state.selectedIdx = Math.max(0, Math.min(next, max));
-}
-function applySelectedIdx(state, idx) {
-  const max = state.results.length - 1;
-  state.selectedIdx = Math.max(0, Math.min(idx, max));
-}
-function applySyncStatus(state, status) {
-  state.syncStatus = status;
-}
-function applyAuthModal(state, visible) {
-  state.showAuthModal = visible;
-}
-function applyDiff(state, bookmarks, results) {
-  state.bookmarks = bookmarks;
-  state.urlSet = buildUrlSet(bookmarks);
-  state.results = results;
-}
-var Store = class {
-  #state = initialState();
-  get state() {
-    return this.#state;
-  }
-  setToken(token) {
-    applyToken(this.#state, token);
-    import_mithril.default.redraw();
-  }
-  setReady(bookmarks, results) {
-    applyReady(this.#state, bookmarks, results);
-    import_mithril.default.redraw();
-  }
-  setQuery(query, results) {
-    applyQuery(this.#state, query, results);
-    writeQueryParam(query);
-    import_mithril.default.redraw();
-  }
-  moveSelection(delta) {
-    applySelection(this.#state, delta);
-    import_mithril.default.redraw();
-  }
-  selectIdx(idx) {
-    applySelectedIdx(this.#state, idx);
-    import_mithril.default.redraw();
-  }
-  beginSync() {
-    applySyncStatus(this.#state, { kind: "syncing", received: 0 });
-    import_mithril.default.redraw();
-  }
-  progressSync(received) {
-    applySyncStatus(this.#state, { kind: "syncing", received });
-    import_mithril.default.redraw();
-  }
-  endSync() {
-    applySyncStatus(this.#state, { kind: "done" });
-    import_mithril.default.redraw();
-  }
-  beginPoll() {
-    applySyncStatus(this.#state, { kind: "polling" });
-    import_mithril.default.redraw();
-  }
-  pollComplete() {
-    applySyncStatus(this.#state, { kind: "upToDate" });
-    import_mithril.default.redraw();
-    setTimeout(() => {
-      if (this.#state.syncStatus.kind === "upToDate") {
-        applySyncStatus(this.#state, { kind: "idle" });
-        import_mithril.default.redraw();
-      }
-    }, 3e3);
-  }
-  errorSync(message) {
-    applySyncStatus(this.#state, { kind: "error", message });
-    import_mithril.default.redraw();
-  }
-  openAuthModal() {
-    applyAuthModal(this.#state, true);
-    import_mithril.default.redraw();
-  }
-  closeAuthModal() {
-    applyAuthModal(this.#state, false);
-    import_mithril.default.redraw();
-  }
-  setFatalError(message, stack) {
-    this.#state.fatalError = { message, stack };
-    import_mithril.default.redraw();
-  }
-  openHelpModal() {
-    this.#state.showHelpModal = true;
-    import_mithril.default.redraw();
-  }
-  closeHelpModal() {
-    this.#state.showHelpModal = false;
-    import_mithril.default.redraw();
-  }
-  applyDiff(bookmarks, results) {
-    applyDiff(this.#state, bookmarks, results);
-    import_mithril.default.redraw();
-  }
-  setWriteOnly(value) {
-    this.#state.writeOnly = value;
-    import_mithril.default.redraw();
-  }
-  urlExists(url) {
-    return this.#state.urlSet.has(url);
-  }
-};
-var store = new Store();
-
-// ../../cmstr/clients/ts/error.ts
-var CmstrError = class extends Error {
-  status;
-  body;
-  constructor(status, body) {
-    super(`HTTP ${status}`);
-    this.name = "CmstrError";
-    this.status = status;
-    this.body = body;
-  }
-};
-
-// ../../cmstr/clients/ts/mod.ts
-var CmstrClient = class {
-  url;
-  token;
-  constructor(config) {
-    this.url = config.url.replace(/\/$/, "");
-    this.token = config.token;
-  }
-  async request(method, path, options) {
-    const fullUrl = new URL(`${this.url}${path}`);
-    if (options?.query) {
-      for (const [key, value] of Object.entries(options.query)) {
-        if (value !== void 0) fullUrl.searchParams.set(key, value);
-      }
-    }
-    const serialisedBody = options?.body !== void 0 ? JSON.stringify(options.body) : void 0;
-    const headers = {
-      Authorization: `Bearer ${this.token}`,
-      Accept: "application/json"
-    };
-    if (serialisedBody !== void 0) {
-      headers["Content-Type"] = "application/json";
-    }
-    if (options?.idempotencyKey !== void 0) {
-      headers["Idempotency-Key"] = options.idempotencyKey;
-    }
-    const response = await fetch(fullUrl, {
-      method,
-      headers,
-      body: serialisedBody
-    });
-    if (response.status === 204) return null;
-    const responseBody = await response.json();
-    if (!response.ok) throw new CmstrError(response.status, responseBody);
-    return responseBody;
-  }
-  async getFeed() {
-    return await this.request("GET", "/feed");
-  }
-  async getEvents(input) {
-    const query = {
-      start: input.start?.toString(),
-      size: input.size?.toString(),
-      ids: input.ids?.join(","),
-      filter: input.filter
-    };
-    return await this.request("GET", `/events/${encodeURIComponent(input.topic)}`, { query });
-  }
-  async getEvent(input) {
-    return await this.request("GET", `/events/${encodeURIComponent(input.topic)}/${input.id}`);
-  }
-  async postEvent(input) {
-    return await this.request("POST", `/events/${encodeURIComponent(input.topic)}`, {
-      body: { payload: input.payload },
-      idempotencyKey: input.idempotencyKey
-    });
-  }
-  async putEvent(input) {
-    return await this.request("PUT", `/events/${encodeURIComponent(input.topic)}/${input.id}`, {
-      body: { payload: input.payload },
-      idempotencyKey: input.idempotencyKey
-    });
-  }
-  async getObjects(input) {
-    const query = { filter: input.filter };
-    return await this.request("GET", `/objects/${encodeURIComponent(input.topic)}`, { query });
-  }
-  async getObject(input) {
-    return await this.request("GET", `/objects/${encodeURIComponent(input.topic)}/${encodeURIComponent(input.id)}`);
-  }
-  async putObject(input) {
-    return await this.request("PUT", `/objects/${encodeURIComponent(input.topic)}/${encodeURIComponent(input.id)}`, {
-      body: { payload: input.payload },
-      idempotencyKey: input.idempotencyKey
-    });
-  }
-  async deleteObject(input) {
-    return await this.request("DELETE", `/objects/${encodeURIComponent(input.topic)}/${encodeURIComponent(input.id)}`);
-  }
-  async postDiff(input) {
-    const { topic, ...body } = input;
-    const result = await this.request("POST", `/diff/${encodeURIComponent(topic)}`, { body });
-    if (result === null) return null;
-    return result;
-  }
-  async *streamEvents(input) {
-    const url = new URL(`${this.url}/events/${encodeURIComponent(input.topic)}`);
-    if (input.start !== void 0) url.searchParams.set("start", input.start.toString());
-    const response = await fetch(url, {
-      signal: input.signal,
-      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/x-ndjson" }
-    });
-    if (!response.ok || !response.body) throw new CmstrError(response.status, await response.json());
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let remainder = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = remainder + value;
-        const lines = chunk.split("\n");
-        remainder = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) yield JSON.parse(trimmed);
-        }
-      }
-      if (remainder.trim()) yield JSON.parse(remainder.trim());
-    } finally {
-      reader.cancel().catch(() => {
-      });
-    }
-  }
-  async *streamObjects(input) {
-    const url = new URL(`${this.url}/objects/${encodeURIComponent(input.topic)}`);
-    if (input.start !== void 0) url.searchParams.set("start", input.start.toString());
-    const response = await fetch(url, {
-      signal: input.signal,
-      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/x-ndjson" }
-    });
-    if (!response.ok || !response.body) throw new CmstrError(response.status, await response.json());
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let remainder = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = remainder + value;
-        const lines = chunk.split("\n");
-        remainder = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) yield JSON.parse(trimmed);
-        }
-      }
-      if (remainder.trim()) yield JSON.parse(remainder.trim());
-    } finally {
-      reader.cancel().catch(() => {
-      });
-    }
-  }
-};
-
-// ../../cmstr/src/commons/constants.ts
-var TOMBSTONE_RETENTION_MS = 24 * 60 * 60 * 1e3;
-var METRICS_BUCKET_TTL_MS = 24 * 60 * 60 * 1e3;
+// vendor/cmstr/hashing.ts
+var UINT64_BYTES = 8;
 var SHA256_BYTES = 32;
-var MAX_REQUEST_BODY_BYTES = 128 * 1024;
-var IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1e3;
-
-// ../../cmstr/src/api/storage/kv/hashing.ts
 function hexToBytes(hex) {
   const buf = new Uint8Array(hex.length / 2);
   for (let idx = 0; idx < buf.length; idx++) {
@@ -2519,6 +2323,16 @@ async function sha256Hex(data) {
   const hash = await crypto.subtle.digest("SHA-256", data.buffer);
   return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+function hashEventBucket(entries) {
+  const buf = new Uint8Array(entries.length * UINT64_BYTES * 2);
+  const view = new DataView(buf.buffer);
+  for (let idx = 0; idx < entries.length; idx++) {
+    view.setBigUint64(idx * UINT64_BYTES * 2, BigInt(entries[idx].id), false);
+    view.setBigUint64(idx * UINT64_BYTES * 2 + UINT64_BYTES, BigInt(entries[idx].updatedAt), false);
+  }
+  return sha256Hex(buf);
+}
+var hashBucket = hashEventBucket;
 function hashBucketRoot(bucketHashes) {
   const buf = new Uint8Array(bucketHashes.length * SHA256_BYTES);
   for (let idx = 0; idx < bucketHashes.length; idx++) {
@@ -2527,101 +2341,613 @@ function hashBucketRoot(bucketHashes) {
   return sha256Hex(buf);
 }
 
-// ts/sync.ts
-async function buildBuckets(events) {
-  const bucketMap = /* @__PURE__ */ new Map();
-  for (const event of events) {
-    const bucketStart = Math.floor(event.id / DIFF_BUCKET_SIZE) * DIFF_BUCKET_SIZE;
-    if (!bucketMap.has(bucketStart)) bucketMap.set(bucketStart, []);
-    bucketMap.get(bucketStart).push(event);
-  }
-  const bucketStarts = [...bucketMap.keys()].sort((startA, startB) => startA - startB);
-  const buckets = await Promise.all(
-    bucketStarts.map(async (start) => {
-      const entries = bucketMap.get(start).sort((eventA, eventB) => eventA.id - eventB.id).map((event) => ({ id: event.id, updatedAt: event.updatedAt }));
-      const hash = await hashEventBucket2(entries);
-      return { start, end: start + DIFF_BUCKET_SIZE, hash };
-    })
-  );
-  const root = buckets.length === 0 ? await hashBucketRoot([]) : await hashBucketRoot(buckets.map((bucket) => bucket.hash));
-  return { buckets, root };
+// vendor/cmstr/constants.ts
+var TAIL_DURATION_MS = 5e3;
+var DEFAULT_EVENT_BUCKET_SIZE = 500;
+var DEFAULT_OBJECT_BUCKET_SIZE = 50;
+
+// vendor/cmstr/idb/events.ts
+var IDB_EVENT_STORE = "events";
+function toEntry(stored) {
+  return { id: stored.id, createdAt: stored.createdAt, updatedAt: stored.updatedAt, payload: stored.payload };
 }
-async function initialSync(token, start, onProgress) {
-  const client = new CmstrClient({ url: CMSTR_URL, token });
-  const controller = new AbortController();
-  let idleTimer = null;
-  function resetIdleTimer() {
-    if (idleTimer !== null) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+var IDBEventStore = class {
+  constructor(db) {
+    this.db = db;
   }
-  const batch = [];
-  let total = 0;
-  resetIdleTimer();
+  readEvent(topic, id) {
+    return this.db.get(IDB_EVENT_STORE, this.#key(topic, id)).then((result) => result ? toEntry(result) : null);
+  }
+  readEvents(topic, opts) {
+    if (opts.ids) {
+      return this.#readByIds(topic, opts.ids);
+    }
+    return this.#readRange(topic, opts.start ?? 1, opts.size);
+  }
+  async updateEvent(topic, id, payload, timestamps) {
+    const existing = await this.readEvent(topic, id);
+    const now = Date.now();
+    const entry = {
+      id,
+      createdAt: timestamps?.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: timestamps?.updatedAt ?? now,
+      payload
+    };
+    await this.#put(topic, entry);
+    return { entry: toEntry(entry), created: existing === null };
+  }
+  async writeEvent(topic, payload) {
+    const nextId = await this.#nextId(topic);
+    const now = Date.now();
+    const entry = { id: nextId, createdAt: now, updatedAt: now, payload };
+    await this.#put(topic, entry);
+    return toEntry(entry);
+  }
+  async diffEvents(topic, req) {
+    const all = await this.readEvents(topic, {}) ?? [];
+    const bucketMap = /* @__PURE__ */ new Map();
+    for (const entry of all) {
+      const start = Math.floor((entry.id - 1) / DEFAULT_EVENT_BUCKET_SIZE) * DEFAULT_EVENT_BUCKET_SIZE;
+      if (!bucketMap.has(start)) bucketMap.set(start, []);
+      bucketMap.get(start).push({ id: entry.id, updatedAt: entry.updatedAt });
+    }
+    const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
+    const localHashes = await Promise.all(bucketStarts.map(async (start) => {
+      const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
+      return { start, hash: await hashBucket(sorted) };
+    }));
+    const localRoot = await hashBucketRoot(localHashes.map((bucket) => bucket.hash));
+    if (localRoot === req.root) return { kind: "match" };
+    const localHashMap = new Map(localHashes.map((bucket) => [bucket.start, bucket.hash]));
+    const clientStarts = new Set(req.buckets.map((bucket) => bucket.start));
+    const ranges = [];
+    for (const clientBucket of req.buckets) {
+      const localHash = localHashMap.get(clientBucket.start);
+      if (localHash !== clientBucket.hash) {
+        ranges.push({ start: clientBucket.start, end: clientBucket.end });
+      }
+    }
+    for (const start of bucketStarts) {
+      if (!clientStarts.has(start)) {
+        ranges.push({ start, end: start + DEFAULT_EVENT_BUCKET_SIZE });
+      }
+    }
+    return { kind: "diff", ranges };
+  }
+  #key(topic, id) {
+    return `${topic}:${id}`;
+  }
+  async #readByIds(topic, ids) {
+    const results = await Promise.all(ids.map((id) => this.db.get(IDB_EVENT_STORE, this.#key(topic, id))));
+    return results.filter((result) => result !== void 0).map(toEntry).sort((first, second) => first.id - second.id);
+  }
+  async #readRange(topic, start, size) {
+    const tx = this.db.transaction(IDB_EVENT_STORE, "readonly");
+    const store2 = tx.objectStore(IDB_EVENT_STORE);
+    const lower = this.#key(topic, start);
+    const upper = `${topic}:\uFFFF`;
+    const range = IDBKeyRange.bound(lower, upper);
+    const results = [];
+    let cursor = await store2.openCursor(range);
+    while (cursor) {
+      if (size !== void 0 && results.length >= size) break;
+      results.push(toEntry(cursor.value));
+      cursor = await cursor.continue();
+    }
+    return results;
+  }
+  #put(topic, entry) {
+    return this.db.put(IDB_EVENT_STORE, entry, this.#key(topic, entry.id)).then(() => void 0);
+  }
+  async #nextId(topic) {
+    const all = await this.readEvents(topic, {}) ?? [];
+    return all.length > 0 ? all[all.length - 1].id + 1 : 1;
+  }
+};
+
+// vendor/cmstr/idb/objects.ts
+var IDB_OBJECT_STORE = "objects";
+var IDB_OBJECT_SEQ_INDEX = "by-seq";
+function toEntry2(stored) {
+  return { id: stored.id, seq: stored.seq, createdAt: stored.createdAt, updatedAt: stored.updatedAt, payload: stored.payload };
+}
+var IDBObjectStore2 = class {
+  constructor(db) {
+    this.db = db;
+  }
+  readObject(topic, id) {
+    return this.db.get(IDB_OBJECT_STORE, this.#key(topic, id)).then((result) => result ? toEntry2(result) : null);
+  }
+  async readObjectsBySeq(topic, opts) {
+    const tx = this.db.transaction(IDB_OBJECT_STORE, "readonly");
+    const index = tx.objectStore(IDB_OBJECT_STORE).index(IDB_OBJECT_SEQ_INDEX);
+    const lower = opts.start ?? 0;
+    const upper = [topic, "\uFFFF"];
+    const range = IDBKeyRange.bound([topic, lower], upper);
+    const results = [];
+    let cursor = await index.openCursor(range);
+    while (cursor) {
+      if (opts.size !== void 0 && results.length >= opts.size) break;
+      const stored = cursor.value;
+      if (stored.topic !== topic) break;
+      results.push(toEntry2(stored));
+      cursor = await cursor.continue();
+    }
+    return results;
+  }
+  async upsertObject(topic, id, payload, timestamps) {
+    const existing = await this.readObject(topic, id);
+    const now = Date.now();
+    const seq = timestamps?.seq ?? await this.#nextSeq(topic);
+    const stored = {
+      id,
+      topic,
+      seq,
+      createdAt: timestamps?.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: timestamps?.updatedAt ?? now,
+      payload
+    };
+    await this.#put(stored);
+    return toEntry2(stored);
+  }
+  async deleteObject(topic, id, timestamps) {
+    const existing = await this.readObject(topic, id);
+    const now = Date.now();
+    const seq = timestamps?.seq ?? await this.#nextSeq(topic);
+    const stored = {
+      id,
+      topic,
+      seq,
+      createdAt: timestamps?.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: timestamps?.updatedAt ?? now,
+      payload: null
+    };
+    await this.#put(stored);
+    return toEntry2(stored);
+  }
+  async diffObjects(topic, req) {
+    const all = await this.readObjectsBySeq(topic, {}) ?? [];
+    const bucketMap = /* @__PURE__ */ new Map();
+    for (const entry of all) {
+      const start = Math.floor((entry.seq - 1) / DEFAULT_OBJECT_BUCKET_SIZE) * DEFAULT_OBJECT_BUCKET_SIZE;
+      if (!bucketMap.has(start)) bucketMap.set(start, []);
+      bucketMap.get(start).push({ id: entry.seq, updatedAt: entry.updatedAt });
+    }
+    const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
+    const localHashes = await Promise.all(bucketStarts.map(async (start) => {
+      const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
+      return { start, hash: await hashBucket(sorted) };
+    }));
+    const localRoot = await hashBucketRoot(localHashes.map((bucket) => bucket.hash));
+    if (localRoot === req.root) return { kind: "match" };
+    const localHashMap = new Map(localHashes.map((bucket) => [bucket.start, bucket.hash]));
+    const clientStarts = new Set(req.buckets.map((bucket) => bucket.start));
+    const ranges = [];
+    for (const clientBucket of req.buckets) {
+      const localHash = localHashMap.get(clientBucket.start);
+      if (localHash !== clientBucket.hash) {
+        ranges.push({ start: clientBucket.start, end: clientBucket.end });
+      }
+    }
+    for (const start of bucketStarts) {
+      if (!clientStarts.has(start)) {
+        ranges.push({ start, end: start + DEFAULT_OBJECT_BUCKET_SIZE });
+      }
+    }
+    return { kind: "diff", ranges };
+  }
+  #key(topic, id) {
+    return `${topic}:${id}`;
+  }
+  #put(stored) {
+    return this.db.put(IDB_OBJECT_STORE, stored, this.#key(stored.topic, stored.id)).then(() => void 0);
+  }
+  async #nextSeq(topic) {
+    const all = await this.readObjectsBySeq(topic, {}) ?? [];
+    return all.length > 0 ? all[all.length - 1].seq + 1 : 1;
+  }
+};
+
+// vendor/cmstr/idb/cursors.ts
+var IDB_CURSOR_STORE = "cursors";
+var IDBCursorStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async getEventCursor(topic) {
+    return await this.#get(`event:${topic}`);
+  }
+  setEventCursor(topic, id) {
+    return this.#set(`event:${topic}`, id);
+  }
+  async getObjectCursor(topic) {
+    return await this.#get(`object:${topic}`);
+  }
+  setObjectCursor(topic, seq) {
+    return this.#set(`object:${topic}`, seq);
+  }
+  async #get(key) {
+    const val = await this.db.get(IDB_CURSOR_STORE, key);
+    return val ?? 0;
+  }
+  #set(key, value) {
+    return this.db.put(IDB_CURSOR_STORE, value, key).then(() => void 0);
+  }
+};
+
+// vendor/cmstr/idb/index.ts
+var IDB_VERSION = 2;
+var IDBBackend = class _IDBBackend {
+  events;
+  objects;
+  cursors;
+  constructor(db) {
+    this.events = new IDBEventStore(db);
+    this.objects = new IDBObjectStore2(db);
+    this.cursors = new IDBCursorStore(db);
+  }
+  static async open(name) {
+    const db = await openDB(name, IDB_VERSION, {
+      upgrade(db2, oldVersion, _newVersion, transaction) {
+        if (oldVersion < 1) {
+          db2.createObjectStore(IDB_EVENT_STORE);
+          const store2 = db2.createObjectStore(IDB_OBJECT_STORE);
+          store2.createIndex("by-seq", ["topic", "seq"], { unique: false });
+          db2.createObjectStore(IDB_CURSOR_STORE);
+          return;
+        }
+        if (oldVersion < 2) {
+          const store2 = transaction.objectStore(IDB_OBJECT_STORE);
+          store2.deleteIndex("by-seq");
+          store2.createIndex("by-seq", ["topic", "seq"], { unique: false });
+        }
+      }
+    });
+    return new _IDBBackend(db);
+  }
+};
+
+// vendor/cmstr/idb/scheduler.ts
+var SetIntervalScheduler = class {
+  handles = /* @__PURE__ */ new Map();
+  schedule(id, intervalMs, fn) {
+    if (this.handles.has(id)) return;
+    const handle = setInterval(() => {
+      fn().catch((err) => console.error("[cmstr] scheduler error", err));
+    }, intervalMs);
+    this.handles.set(id, handle);
+  }
+  cancelAll() {
+    for (const handle of this.handles.values()) clearInterval(handle);
+    this.handles.clear();
+  }
+};
+
+// vendor/cmstr/diff.ts
+function groupByBucket(entries, bucketSize) {
+  const map = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    const start = Math.floor((entry.id - 1) / bucketSize) * bucketSize;
+    if (!map.has(start)) map.set(start, []);
+    map.get(start).push(entry);
+  }
+  return map;
+}
+async function buildDiffRequest(entries, bucketSize) {
+  const bucketMap = groupByBucket(entries, bucketSize);
+  const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
+  const buckets = await Promise.all(bucketStarts.map(async (start) => {
+    const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
+    const hash = await hashBucket(sorted);
+    return { start, end: start + bucketSize, hash };
+  }));
+  const root = await hashBucketRoot(buckets.map((bucket) => bucket.hash));
+  return { root, buckets };
+}
+function buildEventDiffRequest(entries) {
+  return buildDiffRequest(
+    entries.map((entry) => ({ id: entry.id, updatedAt: entry.updatedAt })),
+    DEFAULT_EVENT_BUCKET_SIZE
+  );
+}
+function buildObjectDiffRequest(entries) {
+  return buildDiffRequest(
+    entries.map((entry) => ({ id: entry.seq, updatedAt: entry.updatedAt })),
+    DEFAULT_OBJECT_BUCKET_SIZE
+  );
+}
+
+// vendor/cmstr/sync.ts
+var STATUS_NO_CONTENT = 204;
+function authHeaders(token) {
+  return { "Authorization": `Bearer ${token}` };
+}
+async function postDiff(baseUrl, topic, token, body) {
+  const res = await fetch(`${baseUrl}/diff/${topic}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(body)
+  });
+  if (res.status === STATUS_NO_CONTENT) return { kind: "match" };
+  if (!res.ok) throw new Error(`POST /diff/${topic} failed: ${res.status}`);
+  const json = await res.json();
+  return { kind: "diff", ranges: json.ranges };
+}
+async function fetchEventRange(baseUrl, topic, token, start, size) {
+  const res = await fetch(`${baseUrl}/events/${topic}?start=${start}&size=${size}`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`GET /events/${topic} failed: ${res.status}`);
+  const body = await res.json();
+  return body.entries ?? [];
+}
+async function fetchObjectRange(baseUrl, topic, token, start, size) {
+  const res = await fetch(`${baseUrl}/objects/${topic}?start=${start}&size=${size}`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`GET /objects/${topic} failed: ${res.status}`);
+  const body = await res.json();
+  return body.entries ?? [];
+}
+async function tailEventStream(baseUrl, topic, token, startId, durationMs = TAIL_DURATION_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), durationMs);
+  const collected = [];
   try {
-    for await (const event of client.streamEvents({ topic: BOOKMARKS_TOPIC, start, signal: controller.signal })) {
-      resetIdleTimer();
-      batch.push(event);
-      if (batch.length >= 500) {
-        total += batch.length;
-        await appendEvents(batch.splice(0));
-        onProgress?.(total);
+    const res = await fetch(`${baseUrl}/events/${topic}?start=${startId}`, {
+      headers: { ...authHeaders(token), "Accept": "application/x-ndjson" },
+      signal: controller.signal
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.trim()) collected.push(JSON.parse(line));
       }
     }
   } catch (err) {
     if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
   } finally {
-    if (idleTimer !== null) clearTimeout(idleTimer);
-  }
-  if (batch.length > 0) {
-    total += batch.length;
-    await appendEvents(batch);
-    onProgress?.(total);
-  }
-}
-async function fetchRange(client, start, end) {
-  const collected = [];
-  let cursor = start;
-  while (cursor < end) {
-    const response = await client.getEvents({
-      topic: BOOKMARKS_TOPIC,
-      start: cursor > 0 ? cursor : void 0,
-      size: DIFF_BUCKET_SIZE
-    });
-    if (response.entries.length === 0) break;
-    collected.push(...response.entries);
-    if (response.next === null) break;
-    cursor = response.next;
+    clearTimeout(timeout);
   }
   return collected;
 }
-async function postBookmark(token, url) {
-  const client = new CmstrClient({ url: CMSTR_URL, token });
-  await client.postEvent({
-    topic: BOOKMARKS_TOPIC,
-    payload: { url },
-    idempotencyKey: url
-  });
+async function applyEventEntry(backend, topic, entry) {
+  await backend.events.updateEvent(topic, entry.id, entry.payload, { createdAt: entry.createdAt, updatedAt: entry.updatedAt });
+  return { type: "upsert", topic, entry };
 }
-async function diffSync(token) {
-  const localEvents = await readAllEvents();
-  const { buckets, root } = await buildBuckets(localEvents);
-  const url = new URL(`/diff/${encodeURIComponent(BOOKMARKS_TOPIC)}`, CMSTR_URL);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ root, buckets })
-  });
-  if (response.status === 204) return [];
-  if (!response.ok) throw new Error(`Diff failed: HTTP ${response.status}`);
-  const { ranges } = await response.json();
-  const client = new CmstrClient({ url: CMSTR_URL, token });
-  const fetched = (await Promise.all(ranges.map((range) => fetchRange(client, range.start, range.end)))).flat();
-  if (fetched.length > 0) await appendEvents(fetched);
-  return fetched;
+async function applyObjectEntry(backend, topic, entry) {
+  const timestamps = { seq: entry.seq, createdAt: entry.createdAt, updatedAt: entry.updatedAt };
+  if (entry.payload === null) {
+    await backend.objects.deleteObject(topic, entry.id, timestamps);
+    return { type: "delete", topic, id: entry.id };
+  }
+  await backend.objects.upsertObject(topic, entry.id, entry.payload, timestamps);
+  return { type: "upsert", topic, entry };
 }
+async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs, onProgress) {
+  const cursor = await backend.cursors.getEventCursor(topic);
+  const local = await backend.events.readEvents(topic, {}) ?? [];
+  const changes = [];
+  if (local.length === 0 && cursor === 0) {
+    let start = 1;
+    let maxId2 = 0;
+    let count = 0;
+    while (true) {
+      const entries = await fetchEventRange(baseUrl, topic, token, start, DEFAULT_EVENT_BUCKET_SIZE);
+      for (const entry of entries) {
+        changes.push(await applyEventEntry(backend, topic, entry));
+        maxId2 = Math.max(maxId2, entry.id);
+        count++;
+      }
+      onProgress?.(count);
+      if (entries.length < DEFAULT_EVENT_BUCKET_SIZE) break;
+      start = entries[entries.length - 1].id + 1;
+    }
+    const tailed2 = await tailEventStream(baseUrl, topic, token, maxId2 + 1, tailDurationMs);
+    for (const entry of tailed2) {
+      changes.push(await applyEventEntry(backend, topic, entry));
+      maxId2 = Math.max(maxId2, entry.id);
+      count++;
+    }
+    onProgress?.(count);
+    if (maxId2 > 0) await backend.cursors.setEventCursor(topic, maxId2);
+    return changes;
+  }
+  const diffReq = await buildEventDiffRequest(local);
+  const result = await postDiff(baseUrl, topic, token, diffReq);
+  if (result.kind === "match") return changes;
+  let maxId = local.length > 0 ? local[local.length - 1].id : 0;
+  for (const range of result.ranges) {
+    const entries = await fetchEventRange(baseUrl, topic, token, range.start + 1, DEFAULT_EVENT_BUCKET_SIZE);
+    for (const entry of entries) {
+      changes.push(await applyEventEntry(backend, topic, entry));
+      maxId = Math.max(maxId, entry.id);
+    }
+  }
+  const tailed = await tailEventStream(baseUrl, topic, token, maxId + 1, tailDurationMs);
+  for (const entry of tailed) {
+    changes.push(await applyEventEntry(backend, topic, entry));
+    maxId = Math.max(maxId, entry.id);
+  }
+  if (maxId > 0) await backend.cursors.setEventCursor(topic, maxId);
+  return changes;
+}
+async function syncObjectTopic(backend, baseUrl, token, topic) {
+  const local = await backend.objects.readObjectsBySeq(topic, {}) ?? [];
+  const changes = [];
+  if (local.length === 0) {
+    let start = 1;
+    let maxSeq2 = 0;
+    while (true) {
+      const entries = await fetchObjectRange(baseUrl, topic, token, start, DEFAULT_OBJECT_BUCKET_SIZE);
+      for (const entry of entries) {
+        changes.push(await applyObjectEntry(backend, topic, entry));
+        maxSeq2 = Math.max(maxSeq2, entry.seq);
+      }
+      if (entries.length < DEFAULT_OBJECT_BUCKET_SIZE) break;
+      start = entries[entries.length - 1].seq + 1;
+    }
+    if (maxSeq2 > 0) await backend.cursors.setObjectCursor(topic, maxSeq2);
+    return changes;
+  }
+  const diffReq = await buildObjectDiffRequest(local);
+  const result = await postDiff(baseUrl, topic, token, diffReq);
+  if (result.kind === "match") return changes;
+  let maxSeq = local.length > 0 ? local[local.length - 1].seq : 0;
+  for (const range of result.ranges) {
+    const entries = await fetchObjectRange(baseUrl, topic, token, range.start + 1, DEFAULT_OBJECT_BUCKET_SIZE);
+    for (const entry of entries) {
+      changes.push(await applyObjectEntry(backend, topic, entry));
+      maxSeq = Math.max(maxSeq, entry.seq);
+    }
+  }
+  if (maxSeq > 0) await backend.cursors.setObjectCursor(topic, maxSeq);
+  return changes;
+}
+
+// vendor/cmstr/logger.ts
+var NoopLogger = class {
+  info(_message, _request, _data) {
+  }
+  error(_message, _request, _data) {
+  }
+};
+
+// vendor/cmstr/node.ts
+var CommonStorageNode = class {
+  backend;
+  scheduler;
+  logger;
+  subscriptions;
+  watchers = /* @__PURE__ */ new Map();
+  constructor(services, subscriptions = {}) {
+    this.backend = services.backend;
+    this.scheduler = services.scheduler;
+    this.logger = services.logger ?? new NoopLogger();
+    const events = (subscriptions.events ?? []).map((sub) => ({ topicType: "event", ...sub }));
+    const objects = (subscriptions.objects ?? []).map((sub) => ({ topicType: "object", ...sub }));
+    this.subscriptions = [...events, ...objects];
+  }
+  start() {
+    for (const sub of this.subscriptions) {
+      this.scheduler.schedule(`cmstr-sync-${sub.topic}`, sub.intervalMs, () => this.sync(sub.topic));
+    }
+  }
+  stop() {
+    this.scheduler.cancelAll();
+  }
+  async sync(topic) {
+    const sub = this.subscriptions.find((declared) => declared.topic === topic);
+    if (!sub) return;
+    if (!sub.token) return;
+    try {
+      const changes = sub.topicType === "event" ? await syncEventTopic(this.backend, sub.remoteUrl, sub.token, topic, sub.tailDurationMs) : await syncObjectTopic(this.backend, sub.remoteUrl, sub.token, topic);
+      for (const change of changes) this.#emit(change);
+    } catch (err) {
+      this.logger.error("sync failed", void 0, { topic, error: String(err) });
+    }
+  }
+  getEvent(topic, id) {
+    return this.backend.events.readEvent(topic, id);
+  }
+  getEvents(topic, opts = {}) {
+    return this.backend.events.readEvents(topic, opts);
+  }
+  async postEvent(topic, payload) {
+    const entry = await this.backend.events.writeEvent(topic, payload);
+    if (entry) {
+      this.#emit({ type: "upsert", topic, entry });
+      await this.#pushEvent(topic, "POST", payload);
+    }
+    return entry;
+  }
+  async putEvent(topic, id, payload) {
+    const result = await this.backend.events.updateEvent(topic, id, payload);
+    if (result) {
+      this.#emit({ type: "upsert", topic, entry: result.entry });
+      await this.#pushEvent(topic, "PUT", payload, id);
+    }
+    return result?.entry ?? null;
+  }
+  getObject(topic, id) {
+    return this.backend.objects.readObject(topic, id);
+  }
+  getObjects(topic, opts = {}) {
+    return this.backend.objects.readObjectsBySeq(topic, opts);
+  }
+  async putObject(topic, id, payload) {
+    const entry = await this.backend.objects.upsertObject(topic, id, payload);
+    if (entry) {
+      this.#emit({ type: "upsert", topic, entry });
+      await this.#pushObject(topic, id, "PUT", payload);
+    }
+    return entry;
+  }
+  async deleteObject(topic, id) {
+    const entry = await this.backend.objects.deleteObject(topic, id);
+    if (entry) {
+      this.#emit({ type: "delete", topic, id });
+      await this.#pushObject(topic, id, "DELETE");
+    }
+    return entry;
+  }
+  async *watch(topic) {
+    const queue = [];
+    let resolve = null;
+    const handler = (event) => {
+      queue.push(event);
+      resolve?.();
+      resolve = null;
+    };
+    if (!this.watchers.has(topic)) this.watchers.set(topic, []);
+    this.watchers.get(topic).push(handler);
+    try {
+      while (true) {
+        while (queue.length > 0) yield queue.shift();
+        await new Promise((res) => {
+          resolve = res;
+        });
+      }
+    } finally {
+      const handlers = this.watchers.get(topic);
+      if (handlers) {
+        const idx = handlers.indexOf(handler);
+        if (idx !== -1) handlers.splice(idx, 1);
+      }
+    }
+  }
+  #emit(event) {
+    const handlers = this.watchers.get(event.topic) ?? [];
+    for (const handler of handlers) handler(event);
+  }
+  async #pushEvent(topic, method, payload, id) {
+    const sub = this.subscriptions.find((declared) => declared.topic === topic);
+    if (!sub) return;
+    const url = method === "POST" ? `${sub.remoteUrl}/events/${topic}` : `${sub.remoteUrl}/events/${topic}/${id}`;
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sub.token}` },
+      body: JSON.stringify({ payload })
+    }).catch((err) => {
+      this.logger.error("event push failed", void 0, { topic, method, error: String(err) });
+    });
+  }
+  async #pushObject(topic, id, method, payload) {
+    const sub = this.subscriptions.find((declared) => declared.topic === topic);
+    if (!sub) return;
+    const url = `${sub.remoteUrl}/objects/${topic}/${id}`;
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sub.token}` },
+      body: method === "PUT" ? JSON.stringify({ payload }) : void 0
+    }).catch((err) => {
+      this.logger.error("object push failed", void 0, { topic, id, method, error: String(err) });
+    });
+  }
+};
 
 // ts/replay.ts
 function toBookmark(event) {
@@ -4582,29 +4908,50 @@ function runSearch(query, bookmarks) {
   return sortResults(filtered, scoredIds);
 }
 
+// ts/constants.ts
+var CMSTR_URL = "https://cs.rho.ie";
+var BOOKMARKS_TOPIC = "bookmark";
+var CMSTR_IDB_NAME = "cmstr-bkmk";
+var POLL_INTERVAL_MS = 6e4;
+
+// ts/sync.ts
+var _node = null;
+function setNode(node) {
+  _node = node;
+}
+async function postBookmark(url) {
+  if (!_node) throw new Error("node not initialised");
+  await _node.postEvent(BOOKMARKS_TOPIC, { url });
+}
+
 // ts/boot.ts
-function onSyncProgress(received) {
-  store.progressSync(received);
-}
-function syncErrorMessage(_err) {
-  return "SYNC ERROR";
-}
 function isAuthError(err) {
   const message = err instanceof Error ? err.message : String(err);
   return message.includes("403") || message.includes("401");
 }
-async function runInitialSync(token, start) {
-  store.beginSync();
-  try {
-    await initialSync(token, start, onSyncProgress);
-    store.endSync();
-  } catch (err) {
-    if (!isAuthError(err)) store.errorSync(syncErrorMessage(err));
-    throw err;
+async function migrateOldIDB(backend) {
+  const databases = await indexedDB.databases();
+  if (!databases.some((db) => db.name === "bkmk")) return;
+  const oldDb = await openDB("bkmk", 1);
+  const events = await oldDb.getAll("events");
+  oldDb.close();
+  if (events.length === 0) {
+    indexedDB.deleteDatabase("bkmk");
+    return;
   }
+  let maxId = 0;
+  for (const event of events) {
+    await backend.events.updateEvent(BOOKMARKS_TOPIC, event.id, event.payload, {
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt
+    });
+    maxId = Math.max(maxId, event.id);
+  }
+  if (maxId > 0) await backend.cursors.setEventCursor(BOOKMARKS_TOPIC, maxId);
+  indexedDB.deleteDatabase("bkmk");
 }
-async function replayAndReady() {
-  const events = await readAllEvents();
+async function replayAndReady(backend) {
+  const events = await backend.events.readEvents(BOOKMARKS_TOPIC, {}) ?? [];
   const bookmarks = replayEvents(events);
   rebuildIndex(bookmarks);
   const query = readQueryParam();
@@ -4612,51 +4959,65 @@ async function replayAndReady() {
   store.setReady(bookmarks, results);
   if (query) store.setQuery(query, results);
 }
-async function runDiffSync(token) {
-  const newEvents = await diffSync(token);
-  if (newEvents.length === 0) return;
-  const events = await readAllEvents();
-  const bookmarks = replayEvents(events);
-  rebuildIndex(bookmarks);
-  const results = runSearch(store.state.query, bookmarks);
-  store.applyDiff(bookmarks, results);
+function startWatchLoop(node, backend) {
+  let replayTimer = null;
+  (async () => {
+    for await (const _change of node.watch(BOOKMARKS_TOPIC)) {
+      if (replayTimer !== null) clearTimeout(replayTimer);
+      replayTimer = setTimeout(async () => {
+        replayTimer = null;
+        store.beginPoll();
+        const events = await backend.events.readEvents(BOOKMARKS_TOPIC, {}) ?? [];
+        const bookmarks = replayEvents(events);
+        rebuildIndex(bookmarks);
+        const results = runSearch(store.state.query, bookmarks);
+        store.applyDiff(bookmarks, results);
+        store.pollComplete();
+      }, 100);
+    }
+  })().catch(console.error);
 }
 async function startSync(token) {
-  const stored = await readAllEvents();
-  const lastId = await readLastId();
-  if (stored.length === 0) {
-    try {
-      await runInitialSync(token, lastId ?? void 0);
-    } catch (err) {
-      if (isAuthError(err)) {
-        await writeAuthError(true);
-        store.setWriteOnly(true);
-        store.endSync();
-        return;
-      }
-      throw err;
+  const backend = await IDBBackend.open(CMSTR_IDB_NAME);
+  await migrateOldIDB(backend);
+  const scheduler = new SetIntervalScheduler();
+  const node = new CommonStorageNode(
+    { backend, scheduler },
+    {
+      events: [{
+        topic: BOOKMARKS_TOPIC,
+        remoteUrl: CMSTR_URL,
+        token,
+        intervalMs: POLL_INTERVAL_MS
+      }]
     }
-  }
-  await replayAndReady();
-  await runDiffSync(token);
-  await writeAuthError(false);
-}
-var syncInProgress = false;
-async function pollOnce(token) {
-  if (syncInProgress) return;
-  syncInProgress = true;
-  store.beginPoll();
+  );
+  setNode(node);
+  store.beginSync();
   try {
-    await runDiffSync(token);
-    store.pollComplete();
-  } finally {
-    syncInProgress = false;
+    await syncEventTopic(
+      backend,
+      CMSTR_URL,
+      token,
+      BOOKMARKS_TOPIC,
+      void 0,
+      (count) => store.progressSync(count)
+    );
+  } catch (err) {
+    if (isAuthError(err)) {
+      writeAuthError(true);
+      store.setWriteOnly(true);
+      store.endSync();
+      return;
+    }
+    store.errorSync("SYNC ERROR");
+    throw err;
   }
-}
-function startPollLoop(token) {
-  setInterval(() => {
-    pollOnce(token).catch(console.error);
-  }, POLL_INTERVAL_MS);
+  await replayAndReady(backend);
+  store.endSync();
+  writeAuthError(false);
+  startWatchLoop(node, backend);
+  node.start();
 }
 
 // ts/components/app.ts
@@ -4677,7 +5038,7 @@ async function submitToken(event) {
   await writeToken(token);
   store.setToken(token);
   tokenDraft = "";
-  startSync(token).then(() => startPollLoop(token)).catch((err) => {
+  startSync(token).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
     store.setFatalError(message, stack);
@@ -5122,7 +5483,7 @@ async function onSubmit(event) {
   saveStatus = "saving";
   import_mithril9.default.redraw();
   try {
-    await postBookmark(store.state.token, url);
+    await postBookmark(url);
     saveStatus = "saved";
     urlDraft = "";
   } catch {
@@ -5270,7 +5631,8 @@ window.addEventListener("unhandledrejection", (event) => {
   store.setFatalError(message, stack);
 });
 async function main() {
-  const [token, hadAuthError] = await Promise.all([readToken(), readAuthError()]);
+  const token = readToken();
+  const hadAuthError = readAuthError();
   if (token) {
     store.setToken(token);
   } else {
@@ -5278,11 +5640,13 @@ async function main() {
   }
   if (token && hadAuthError) store.openAuthModal();
   import_mithril13.default.mount(document.getElementById("app"), App());
-  if (token && !hadAuthError) startSync(token).then(() => startPollLoop(token)).catch((err) => {
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
-    store.setFatalError(message, stack);
-  });
+  if (token && !hadAuthError) {
+    startSync(token).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
+      store.setFatalError(message, stack);
+    });
+  }
 }
 main().catch((err) => {
   const message = err instanceof Error ? err.message : String(err);

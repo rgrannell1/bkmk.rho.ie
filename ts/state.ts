@@ -2,7 +2,7 @@
 // @work.md
 
 import m from "mithril";
-import type { AppState, Bookmark, SyncStatus } from "./types.ts";
+import type { AppState, Bookmark, SyncStatus, Permissions } from "./types.ts";
 import { writeQueryParam } from "./url-state.ts";
 
 // -- Initial state --
@@ -12,6 +12,7 @@ function initialState(): AppState {
     token:         null,
     ready:         false,
     writeOnly:     false,
+    permissions:   null,
     bookmarks:     new Map(),
     urlSet:        new Set(),
     query:         "",
@@ -179,6 +180,11 @@ class Store {
 
   setWriteOnly(value: boolean): void {
     this.#state.writeOnly = value;
+    m.redraw();
+  }
+
+  setPermissions(permissions: Permissions | null): void {
+    this.#state.permissions = permissions;
     m.redraw();
   }
 

@@ -2,6 +2,9 @@
 // @work.md
 
 import type { EventEntry } from "cmstr";
+import type { Permissions } from "./auth.ts";
+
+export type { Permissions };
 
 export type { EventEntry };
 
@@ -37,6 +40,7 @@ export type AppState = {
   token: string | null;
   ready: boolean;
   writeOnly: boolean;
+  permissions: Permissions | null;
   bookmarks: Map<string, Bookmark>;
   urlSet: Set<string>;
   query: string;

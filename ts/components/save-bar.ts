@@ -33,7 +33,7 @@ async function onSubmit(event: Event): Promise<void> {
   m.redraw();
 
   try {
-    await postBookmark(store.state.token!, url);
+    await postBookmark(url);
     saveStatus = "saved";
     urlDraft = "";
   } catch {
