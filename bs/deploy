@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Build and deploy to Cloudflare Pages.
+
+set -euo pipefail
+
+node bs/build
+
+CACHE_ID=$(grep -m1 "^const CACHE" dist/sw.js | sed "s/.*'\(.*\)'.*/\1/")
+
+npx wrangler pages deploy ./dist \
+  --project-name bkmk-rho-ie \
+  --branch main \
+  --commit-dirty=true
+
+echo "  cache $CACHE_ID"
