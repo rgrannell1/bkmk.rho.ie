@@ -2798,12 +2798,13 @@ var IDBBackend = class _IDBBackend {
           store2.createIndex("by-seq", ["topic", "seq"], { unique: false });
         }
         if (oldVersion < 3) {
-          db2.deleteObjectStore(IDB_EVENT_STORE);
-          db2.createObjectStore(IDB_EVENT_STORE);
-          db2.deleteObjectStore(IDB_CURSOR_STORE);
-          db2.createObjectStore(IDB_CURSOR_STORE);
-          db2.createObjectStore(IDB_MERKLE_EVENT_STORE);
-          db2.createObjectStore(IDB_MERKLE_OBJECT_STORE);
+          for (const store2 of [IDB_EVENT_STORE, IDB_CURSOR_STORE]) {
+            db2.deleteObjectStore(store2);
+            db2.createObjectStore(store2);
+          }
+          for (const store2 of [IDB_MERKLE_EVENT_STORE, IDB_MERKLE_OBJECT_STORE]) {
+            db2.createObjectStore(store2);
+          }
         }
       }
     });
@@ -5403,6 +5404,8 @@ function handleGlobalKey(inputEl, event) {
     if (event.key === "Escape" && store.state.token) store.closeAuthModal();
     return;
   }
+  const active = document.activeElement;
+  if (active && active !== inputEl && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
   if (event.key === "/") {
     event.preventDefault();
     inputEl.focus();

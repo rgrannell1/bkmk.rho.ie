@@ -38,6 +38,9 @@ function handleGlobalKey(inputEl: HTMLInputElement, event: KeyboardEvent): void 
     if (event.key === "Escape" && store.state.token) store.closeAuthModal();
     return;
   }
+  // Another input/textarea is focused — don't steal its keystrokes
+  const active = document.activeElement;
+  if (active && active !== inputEl && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
   if (event.key === "/")          { event.preventDefault(); inputEl.focus(); return; }
   if (event.key === "ArrowDown")  { store.moveSelection(1);  return; }
   if (event.key === "ArrowUp")    { store.moveSelection(-1); return; }
