@@ -113,12 +113,12 @@ class Store {
   }
 
   beginSync(): void {
-    applySyncStatus(this.#state, { kind: "syncing", received: 0 });
+    applySyncStatus(this.#state, { kind: "syncing", phase: "diff", round: 0 });
     m.redraw();
   }
 
-  progressSync(received: number): void {
-    applySyncStatus(this.#state, { kind: "syncing", received });
+  progressSync(event: { phase: "diff"; round: number } | { phase: "fetch"; count: number }): void {
+    applySyncStatus(this.#state, { kind: "syncing", ...event });
     m.redraw();
   }
 

@@ -4,8 +4,11 @@
 import m from "mithril";
 import { store } from "../state.ts";
 
-function progressLabel(received: number): string {
-  return received === 0 ? "connecting…" : `syncing… ${received.toLocaleString()} events`;
+import type { SyncStatus } from "../types.ts";
+
+function progressLabel(status: SyncStatus & { kind: "syncing" }): string {
+  if (status.phase === "diff")  return status.round === 0 ? "connecting…" : `comparing… (round ${status.round})`;
+  return status.count === 0 ? "fetching…" : `syncing… ${status.count.toLocaleString()} events`;
 }
 
 export function SyncProgress() {
@@ -20,7 +23,7 @@ export function SyncProgress() {
       if (status.kind === "syncing") {
         return m("div.sync-progress", [
           m("div.sync-progress-track", m("div.sync-progress-bar")),
-          m("span.sync-progress-label", progressLabel(status.received)),
+          m("span.sync-progress-label", progressLabel(status)),
         ]);
       }
 

@@ -7,6 +7,7 @@ import { store } from "./state.ts";
 import { startSync } from "./boot.ts";
 import { App } from "./components/app.ts";
 import { parsePermissions } from "./auth.ts";
+import { CMSTR_URL } from "./constants.ts";
 
 window.addEventListener("error", (event) => {
   store.setFatalError(event.message, event.error?.stack ?? "(no stack)");
@@ -16,7 +17,8 @@ window.addEventListener("unhandledrejection", (event) => {
   const err = event.reason;
   const message = err instanceof Error ? err.message : String(err);
   const stack   = err instanceof Error ? (err.stack ?? "(no stack)") : "(no stack)";
-  store.setFatalError(message, stack);
+  store.errorSync(message);
+  store.setFatalError(`${message}\n\nServer: ${CMSTR_URL}`, stack);
 });
 
 // Registers a token from the ?token= URL param, stripping it from history immediately.
@@ -62,7 +64,7 @@ async function main(): Promise<void> {
     startSync(token).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       const stack   = err instanceof Error ? (err.stack ?? "(no stack)") : "(no stack)";
-      store.setFatalError(message, stack);
+      store.setFatalError(`${message}\n\nServer: ${CMSTR_URL}`, stack);
     });
   }
 }

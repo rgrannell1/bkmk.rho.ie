@@ -57,7 +57,7 @@ export function SaveBar() {
       const aboveHelpbar = !store.state.writeOnly;
       return m("div.save-bar", { class: aboveHelpbar ? "save-bar--raised" : "" }, [
         m("form.save-form", { onsubmit: onSubmit }, [
-          m("span.save-sigil", "+"),
+          m("button.save-sigil[type=submit]", { disabled: saveStatus === "saving" }, "+"),
           m("input.save-input", {
             type:        "text",
             placeholder: "url…",

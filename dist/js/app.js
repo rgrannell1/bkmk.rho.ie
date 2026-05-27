@@ -2025,11 +2025,11 @@ var Store = class {
     import_mithril.default.redraw();
   }
   beginSync() {
-    applySyncStatus(this.#state, { kind: "syncing", received: 0 });
+    applySyncStatus(this.#state, { kind: "syncing", phase: "diff", round: 0 });
     import_mithril.default.redraw();
   }
-  progressSync(received) {
-    applySyncStatus(this.#state, { kind: "syncing", received });
+  progressSync(event) {
+    applySyncStatus(this.#state, { kind: "syncing", ...event });
     import_mithril.default.redraw();
   }
   endSync() {
@@ -2846,11 +2846,14 @@ async function postDiffRound(baseUrl, topic, token, nodes) {
   const json = await res.json();
   return { kind: "diff", mismatches: json.mismatches };
 }
-async function merkleDiff(baseUrl, topic, token, tree) {
+async function merkleDiff(baseUrl, topic, token, tree, onProgress) {
   const rootHash = await tree.hashForRange(0, MERKLE_TREE_END);
   let frontier = [{ start: 0, end: MERKLE_TREE_END, hash: rootHash }];
   const leafRanges = [];
+  let round = 0;
   while (frontier.length > 0) {
+    round++;
+    onProgress?.({ phase: "diff", round });
     const response = await postDiffRound(baseUrl, topic, token, frontier);
     if (response.kind === "match") break;
     const nextFrontier = [];
@@ -2930,7 +2933,7 @@ async function applyObjectEntry(backend, topic, entry, skipMerkle = false) {
   if (entry.payload === null) return { type: "delete", topic, id: entry.id };
   return { type: "upsert", topic, entry };
 }
-async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs) {
+async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs, onProgress) {
   const cursor = await backend.cursors.getEventCursor(topic);
   const changes = [];
   if (cursor === 0) {
@@ -2941,6 +2944,7 @@ async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs) {
       for (const entry of entries) {
         changes.push(await applyEventEntry(backend, topic, entry, true));
         maxId2 = Math.max(maxId2, entry.id);
+        onProgress?.({ phase: "fetch", count: changes.length });
       }
       if (entries.length < DEFAULT_FETCH_PAGE_SIZE) break;
       start = entries[entries.length - 1].id + 1;
@@ -2954,7 +2958,7 @@ async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs) {
     return changes;
   }
   const tree = backend.merkleEvents ? backend.merkleEvents.forTopic(topic) : buildEventMerkleTree(await backend.events.readEvents(topic, {}) ?? []);
-  const leafRanges = await merkleDiff(baseUrl, topic, token, tree);
+  const leafRanges = await merkleDiff(baseUrl, topic, token, tree, onProgress);
   if (leafRanges.length === 0) return changes;
   let maxId = cursor;
   for (const range of leafRanges) {
@@ -2962,6 +2966,7 @@ async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs) {
     for (const entry of entries) {
       changes.push(await applyEventEntry(backend, topic, entry));
       maxId = Math.max(maxId, entry.id);
+      onProgress?.({ phase: "fetch", count: changes.length });
     }
   }
   const tailed = await tailEventStream(baseUrl, topic, token, maxId + 1, tailDurationMs);
@@ -5207,7 +5212,7 @@ async function startSync(token) {
       token,
       BOOKMARKS_TOPIC,
       void 0,
-      (count) => store.progressSync(count)
+      (event) => store.progressSync(event)
     );
   } catch (err) {
     if (isAuthError(err)) {
@@ -5216,7 +5221,8 @@ async function startSync(token) {
       store.endSync();
       return;
     }
-    store.errorSync("SYNC ERROR");
+    const message = err instanceof Error ? err.message : String(err);
+    store.errorSync(message);
     throw err;
   }
   await replayAndReady(backend);
@@ -5349,8 +5355,9 @@ function AuthModal() {
 
 // ts/components/sync-progress.ts
 var import_mithril3 = __toESM(require_mithril(), 1);
-function progressLabel(received) {
-  return received === 0 ? "connecting\u2026" : `syncing\u2026 ${received.toLocaleString()} events`;
+function progressLabel(status) {
+  if (status.phase === "diff") return status.round === 0 ? "connecting\u2026" : `comparing\u2026 (round ${status.round})`;
+  return status.count === 0 ? "fetching\u2026" : `syncing\u2026 ${status.count.toLocaleString()} events`;
 }
 function SyncProgress() {
   return {
@@ -5362,7 +5369,7 @@ function SyncProgress() {
       if (status.kind === "syncing") {
         return (0, import_mithril3.default)("div.sync-progress", [
           (0, import_mithril3.default)("div.sync-progress-track", (0, import_mithril3.default)("div.sync-progress-bar")),
-          (0, import_mithril3.default)("span.sync-progress-label", progressLabel(status.received))
+          (0, import_mithril3.default)("span.sync-progress-label", progressLabel(status))
         ]);
       }
       if (status.kind === "polling") {
@@ -5768,7 +5775,7 @@ function SaveBar() {
       const aboveHelpbar = !store.state.writeOnly;
       return (0, import_mithril9.default)("div.save-bar", { class: aboveHelpbar ? "save-bar--raised" : "" }, [
         (0, import_mithril9.default)("form.save-form", { onsubmit: onSubmit }, [
-          (0, import_mithril9.default)("span.save-sigil", "+"),
+          (0, import_mithril9.default)("button.save-sigil[type=submit]", { disabled: saveStatus === "saving" }, "+"),
           (0, import_mithril9.default)("input.save-input", {
             type: "text",
             placeholder: "url\u2026",
@@ -5896,7 +5903,10 @@ window.addEventListener("unhandledrejection", (event) => {
   const err = event.reason;
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
-  store.setFatalError(message, stack);
+  store.errorSync(message);
+  store.setFatalError(`${message}
+
+Server: ${CMSTR_URL}`, stack);
 });
 function registerTokenFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -5930,7 +5940,9 @@ async function main() {
     startSync(token).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
-      store.setFatalError(message, stack);
+      store.setFatalError(`${message}
+
+Server: ${CMSTR_URL}`, stack);
     });
   }
 }

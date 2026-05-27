@@ -110,7 +110,7 @@ export async function startSync(token: string): Promise<void> {
       token,
       BOOKMARKS_TOPIC,
       undefined,
-      count => store.progressSync(count),
+      event => store.progressSync(event),
     );
   } catch (err) {
     if (isAuthError(err)) {
@@ -119,7 +119,8 @@ export async function startSync(token: string): Promise<void> {
       store.endSync();
       return;
     }
-    store.errorSync("SYNC ERROR");
+    const message = err instanceof Error ? err.message : String(err);
+    store.errorSync(message);
     throw err;
   }
 
