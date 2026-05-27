@@ -515,4 +515,10 @@ kbd {
 @media (max-width: 768px) {
   .helpbar { display: none; }
   .save-bar--raised { bottom: 0; }
+  .save-sigil {
+    border: 1px solid var(--accent) !important;
+    padding: 0.2rem 0.6rem !important;
+    min-width: 2rem;
+    color: var(--accent);
+  }
 }
