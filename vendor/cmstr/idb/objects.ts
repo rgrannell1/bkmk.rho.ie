@@ -40,9 +40,7 @@ export class IDBObjectStore implements ILocalObjectStore {
     let cursor = await index.openCursor(range);
     while (cursor) {
       if (opts.size !== undefined && results.length >= opts.size) break;
-      const stored = cursor.value as StoredObject;
-      if (stored.topic !== topic) break;
-      results.push(toEntry(stored));
+      results.push(toEntry(cursor.value as StoredObject));
       cursor = await cursor.continue();
     }
     return results;

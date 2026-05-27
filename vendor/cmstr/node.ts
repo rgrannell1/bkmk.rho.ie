@@ -97,6 +97,7 @@ export class CommonStorageNode {
   async postEvent(topic: string, payload: unknown): Promise<EventEntry | null> {
     const entry = await this.backend.events.writeEvent(topic, payload);
     if (entry) {
+      await this.backend.merkleEvents?.invalidatePath(topic, entry.id);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushEvent(topic, "POST", payload);
     }
@@ -106,6 +107,7 @@ export class CommonStorageNode {
   async putEvent(topic: string, id: number, payload: unknown): Promise<EventEntry | null> {
     const result = await this.backend.events.updateEvent(topic, id, payload);
     if (result) {
+      await this.backend.merkleEvents?.invalidatePath(topic, id);
       this.#emit({ type: "upsert", topic, entry: result.entry });
       await this.#pushEvent(topic, "PUT", payload, id);
     }
@@ -121,8 +123,10 @@ export class CommonStorageNode {
   }
 
   async putObject(topic: string, id: string, payload: unknown): Promise<ObjectEntry | null> {
+    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : undefined;
     const entry = await this.backend.objects.upsertObject(topic, id, payload);
     if (entry) {
+      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushObject(topic, id, "PUT", payload);
     }
@@ -130,8 +134,10 @@ export class CommonStorageNode {
   }
 
   async deleteObject(topic: string, id: string): Promise<ObjectEntry | null> {
+    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : undefined;
     const entry = await this.backend.objects.deleteObject(topic, id);
     if (entry) {
+      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "delete", topic, id });
       await this.#pushObject(topic, id, "DELETE");
     }

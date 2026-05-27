@@ -84,8 +84,10 @@ export class IDBMerkleStore implements ILocalMerkleStore {
       return emptyTable[Math.min(MERKLE_TREE_DEPTH, Math.max(0, depth))];
     }
     const mid = Math.floor((start + end) / 2);
-    const leftHash = await this.hashForRange(topic, start, mid);
-    const rightHash = await this.hashForRange(topic, mid, end);
+    const [leftHash, rightHash] = await Promise.all([
+      this.hashForRange(topic, start, mid),
+      this.hashForRange(topic, mid, end),
+    ]);
     return hashMerkleInternalNode(leftHash, rightHash);
   }
 }

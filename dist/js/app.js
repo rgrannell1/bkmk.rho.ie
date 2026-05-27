@@ -1892,6 +1892,7 @@ var import_mithril13 = __toESM(require_mithril(), 1);
 // ts/storage.ts
 var KEY_TOKEN = "bkmk:token";
 var KEY_AUTH_ERROR = "bkmk:authError";
+var KEY_PERMISSIONS = "bkmk:permissions";
 function readToken() {
   return localStorage.getItem(KEY_TOKEN);
 }
@@ -1907,6 +1908,18 @@ function writeAuthError(flag) {
   } else {
     localStorage.removeItem(KEY_AUTH_ERROR);
   }
+}
+function readPermissions() {
+  const raw = localStorage.getItem(KEY_PERMISSIONS);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+function writePermissions(permissions) {
+  localStorage.setItem(KEY_PERMISSIONS, JSON.stringify(permissions));
 }
 
 // ts/state.ts
@@ -1934,6 +1947,7 @@ function initialState() {
     token: null,
     ready: false,
     writeOnly: false,
+    permissions: null,
     bookmarks: /* @__PURE__ */ new Map(),
     urlSet: /* @__PURE__ */ new Set(),
     query: "",
@@ -2066,6 +2080,10 @@ var Store = class {
   }
   setWriteOnly(value) {
     this.#state.writeOnly = value;
+    import_mithril.default.redraw();
+  }
+  setPermissions(permissions) {
+    this.#state.permissions = permissions;
     import_mithril.default.redraw();
   }
   urlExists(url) {
@@ -2309,43 +2327,6 @@ replaceTraps((oldTraps) => ({
   }
 }));
 
-// vendor/cmstr/hashing.ts
-var UINT64_BYTES = 8;
-var SHA256_BYTES = 32;
-function hexToBytes(hex) {
-  const buf = new Uint8Array(hex.length / 2);
-  for (let idx = 0; idx < buf.length; idx++) {
-    buf[idx] = parseInt(hex.slice(idx * 2, idx * 2 + 2), 16);
-  }
-  return buf;
-}
-async function sha256Hex(data) {
-  const hash = await crypto.subtle.digest("SHA-256", data.buffer);
-  return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-function hashEventBucket(entries) {
-  const buf = new Uint8Array(entries.length * UINT64_BYTES * 2);
-  const view = new DataView(buf.buffer);
-  for (let idx = 0; idx < entries.length; idx++) {
-    view.setBigUint64(idx * UINT64_BYTES * 2, BigInt(entries[idx].id), false);
-    view.setBigUint64(idx * UINT64_BYTES * 2 + UINT64_BYTES, BigInt(entries[idx].updatedAt), false);
-  }
-  return sha256Hex(buf);
-}
-var hashBucket = hashEventBucket;
-function hashBucketRoot(bucketHashes) {
-  const buf = new Uint8Array(bucketHashes.length * SHA256_BYTES);
-  for (let idx = 0; idx < bucketHashes.length; idx++) {
-    buf.set(hexToBytes(bucketHashes[idx]), idx * SHA256_BYTES);
-  }
-  return sha256Hex(buf);
-}
-
-// vendor/cmstr/constants.ts
-var TAIL_DURATION_MS = 5e3;
-var DEFAULT_EVENT_BUCKET_SIZE = 500;
-var DEFAULT_OBJECT_BUCKET_SIZE = 50;
-
 // vendor/cmstr/idb/events.ts
 var IDB_EVENT_STORE = "events";
 function toEntry(stored) {
@@ -2383,39 +2364,30 @@ var IDBEventStore = class {
     await this.#put(topic, entry);
     return toEntry(entry);
   }
-  async diffEvents(topic, req) {
-    const all = await this.readEvents(topic, {}) ?? [];
-    const bucketMap = /* @__PURE__ */ new Map();
-    for (const entry of all) {
-      const start = Math.floor((entry.id - 1) / DEFAULT_EVENT_BUCKET_SIZE) * DEFAULT_EVENT_BUCKET_SIZE;
-      if (!bucketMap.has(start)) bucketMap.set(start, []);
-      bucketMap.get(start).push({ id: entry.id, updatedAt: entry.updatedAt });
+  // Returns summaries (id + updatedAt) for events with id in (start, end].
+  async readEventSummaries(topic, start, end) {
+    const tx = this.db.transaction(IDB_EVENT_STORE, "readonly");
+    const store2 = tx.objectStore(IDB_EVENT_STORE);
+    const range = IDBKeyRange.bound(this.#key(topic, start + 1), this.#key(topic, end));
+    const results = [];
+    let cursor = await store2.openCursor(range);
+    while (cursor) {
+      const stored = cursor.value;
+      results.push({ id: stored.id, updatedAt: stored.updatedAt });
+      cursor = await cursor.continue();
     }
-    const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
-    const localHashes = await Promise.all(bucketStarts.map(async (start) => {
-      const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
-      return { start, hash: await hashBucket(sorted) };
-    }));
-    const localRoot = await hashBucketRoot(localHashes.map((bucket) => bucket.hash));
-    if (localRoot === req.root) return { kind: "match" };
-    const localHashMap = new Map(localHashes.map((bucket) => [bucket.start, bucket.hash]));
-    const clientStarts = new Set(req.buckets.map((bucket) => bucket.start));
-    const ranges = [];
-    for (const clientBucket of req.buckets) {
-      const localHash = localHashMap.get(clientBucket.start);
-      if (localHash !== clientBucket.hash) {
-        ranges.push({ start: clientBucket.start, end: clientBucket.end });
-      }
-    }
-    for (const start of bucketStarts) {
-      if (!clientStarts.has(start)) {
-        ranges.push({ start, end: start + DEFAULT_EVENT_BUCKET_SIZE });
-      }
-    }
-    return { kind: "diff", ranges };
+    return results;
+  }
+  // Returns true if no event exists with id in (start, end].
+  async isEventRangeEmpty(topic, start, end) {
+    const tx = this.db.transaction(IDB_EVENT_STORE, "readonly");
+    const store2 = tx.objectStore(IDB_EVENT_STORE);
+    const range = IDBKeyRange.bound(this.#key(topic, start + 1), this.#key(topic, end));
+    const count = await store2.count(range);
+    return count === 0;
   }
   #key(topic, id) {
-    return `${topic}:${id}`;
+    return [topic, id];
   }
   async #readByIds(topic, ids) {
     const results = await Promise.all(ids.map((id) => this.db.get(IDB_EVENT_STORE, this.#key(topic, id))));
@@ -2424,9 +2396,7 @@ var IDBEventStore = class {
   async #readRange(topic, start, size) {
     const tx = this.db.transaction(IDB_EVENT_STORE, "readonly");
     const store2 = tx.objectStore(IDB_EVENT_STORE);
-    const lower = this.#key(topic, start);
-    const upper = `${topic}:\uFFFF`;
-    const range = IDBKeyRange.bound(lower, upper);
+    const range = IDBKeyRange.bound(this.#key(topic, start), this.#key(topic, Infinity));
     const results = [];
     let cursor = await store2.openCursor(range);
     while (cursor) {
@@ -2440,8 +2410,11 @@ var IDBEventStore = class {
     return this.db.put(IDB_EVENT_STORE, entry, this.#key(topic, entry.id)).then(() => void 0);
   }
   async #nextId(topic) {
-    const all = await this.readEvents(topic, {}) ?? [];
-    return all.length > 0 ? all[all.length - 1].id + 1 : 1;
+    const tx = this.db.transaction(IDB_EVENT_STORE, "readonly");
+    const store2 = tx.objectStore(IDB_EVENT_STORE);
+    const range = IDBKeyRange.bound(this.#key(topic, 0), this.#key(topic, Infinity));
+    const cursor = await store2.openCursor(range, "prev");
+    return cursor ? cursor.key[1] + 1 : 1;
   }
 };
 
@@ -2468,9 +2441,7 @@ var IDBObjectStore2 = class {
     let cursor = await index.openCursor(range);
     while (cursor) {
       if (opts.size !== void 0 && results.length >= opts.size) break;
-      const stored = cursor.value;
-      if (stored.topic !== topic) break;
-      results.push(toEntry2(stored));
+      results.push(toEntry2(cursor.value));
       cursor = await cursor.continue();
     }
     return results;
@@ -2505,36 +2476,27 @@ var IDBObjectStore2 = class {
     await this.#put(stored);
     return toEntry2(stored);
   }
-  async diffObjects(topic, req) {
-    const all = await this.readObjectsBySeq(topic, {}) ?? [];
-    const bucketMap = /* @__PURE__ */ new Map();
-    for (const entry of all) {
-      const start = Math.floor((entry.seq - 1) / DEFAULT_OBJECT_BUCKET_SIZE) * DEFAULT_OBJECT_BUCKET_SIZE;
-      if (!bucketMap.has(start)) bucketMap.set(start, []);
-      bucketMap.get(start).push({ id: entry.seq, updatedAt: entry.updatedAt });
+  // Returns summaries (seq as id + updatedAt) for objects with seq in (start, end].
+  async readObjectSummaries(topic, start, end) {
+    const tx = this.db.transaction(IDB_OBJECT_STORE, "readonly");
+    const index = tx.objectStore(IDB_OBJECT_STORE).index(IDB_OBJECT_SEQ_INDEX);
+    const range = IDBKeyRange.bound([topic, start + 1], [topic, end]);
+    const results = [];
+    let cursor = await index.openCursor(range);
+    while (cursor) {
+      const stored = cursor.value;
+      results.push({ id: stored.seq, updatedAt: stored.updatedAt });
+      cursor = await cursor.continue();
     }
-    const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
-    const localHashes = await Promise.all(bucketStarts.map(async (start) => {
-      const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
-      return { start, hash: await hashBucket(sorted) };
-    }));
-    const localRoot = await hashBucketRoot(localHashes.map((bucket) => bucket.hash));
-    if (localRoot === req.root) return { kind: "match" };
-    const localHashMap = new Map(localHashes.map((bucket) => [bucket.start, bucket.hash]));
-    const clientStarts = new Set(req.buckets.map((bucket) => bucket.start));
-    const ranges = [];
-    for (const clientBucket of req.buckets) {
-      const localHash = localHashMap.get(clientBucket.start);
-      if (localHash !== clientBucket.hash) {
-        ranges.push({ start: clientBucket.start, end: clientBucket.end });
-      }
-    }
-    for (const start of bucketStarts) {
-      if (!clientStarts.has(start)) {
-        ranges.push({ start, end: start + DEFAULT_OBJECT_BUCKET_SIZE });
-      }
-    }
-    return { kind: "diff", ranges };
+    return results;
+  }
+  // Returns true if no object exists with seq in (start, end].
+  async isObjectRangeEmpty(topic, start, end) {
+    const tx = this.db.transaction(IDB_OBJECT_STORE, "readonly");
+    const index = tx.objectStore(IDB_OBJECT_STORE).index(IDB_OBJECT_SEQ_INDEX);
+    const range = IDBKeyRange.bound([topic, start + 1], [topic, end]);
+    const count = await index.count(range);
+    return count === 0;
   }
   #key(topic, id) {
     return `${topic}:${id}`;
@@ -2543,8 +2505,11 @@ var IDBObjectStore2 = class {
     return this.db.put(IDB_OBJECT_STORE, stored, this.#key(stored.topic, stored.id)).then(() => void 0);
   }
   async #nextSeq(topic) {
-    const all = await this.readObjectsBySeq(topic, {}) ?? [];
-    return all.length > 0 ? all[all.length - 1].seq + 1 : 1;
+    const tx = this.db.transaction(IDB_OBJECT_STORE, "readonly");
+    const index = tx.objectStore(IDB_OBJECT_STORE).index(IDB_OBJECT_SEQ_INDEX);
+    const range = IDBKeyRange.bound([topic, 0], [topic, Infinity]);
+    const cursor = await index.openCursor(range, "prev");
+    return cursor ? cursor.key[1] + 1 : 1;
   }
 };
 
@@ -2575,31 +2540,267 @@ var IDBCursorStore = class {
   }
 };
 
+// vendor/cmstr/hashing.ts
+var UINT64_BYTES = 8;
+var SHA256_BYTES = 32;
+function hexToBytes(hex) {
+  const buf = new Uint8Array(hex.length / 2);
+  for (let idx = 0; idx < buf.length; idx++) {
+    buf[idx] = parseInt(hex.slice(idx * 2, idx * 2 + 2), 16);
+  }
+  return buf;
+}
+async function sha256Hex(data) {
+  const hash = await crypto.subtle.digest("SHA-256", data.buffer);
+  return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function hashEventBucket(entries) {
+  const buf = new Uint8Array(entries.length * UINT64_BYTES * 2);
+  const view = new DataView(buf.buffer);
+  for (let idx = 0; idx < entries.length; idx++) {
+    view.setBigUint64(idx * UINT64_BYTES * 2, BigInt(entries[idx].id), false);
+    view.setBigUint64(idx * UINT64_BYTES * 2 + UINT64_BYTES, BigInt(entries[idx].updatedAt), false);
+  }
+  return sha256Hex(buf);
+}
+var hashBucket = hashEventBucket;
+function hashMerkleInternalNode(leftHash, rightHash) {
+  const buf = new Uint8Array(SHA256_BYTES * 2);
+  buf.set(hexToBytes(leftHash), 0);
+  buf.set(hexToBytes(rightHash), SHA256_BYTES);
+  return sha256Hex(buf);
+}
+
+// vendor/cmstr/constants.ts
+var TAIL_DURATION_MS = 5e3;
+var DEFAULT_FETCH_PAGE_SIZE = 500;
+var MERKLE_LEAF_SIZE = 100;
+var MERKLE_TREE_END = MERKLE_LEAF_SIZE * (1 << 20);
+var MERKLE_TREE_DEPTH = 20;
+
+// vendor/cmstr/diff.ts
+var emptyHashTablePromise = null;
+function getEmptyHashTable() {
+  if (emptyHashTablePromise === null) {
+    emptyHashTablePromise = buildEmptyHashTable();
+  }
+  return emptyHashTablePromise;
+}
+function merklePath(id) {
+  const path = [];
+  let rangeStart = 0, rangeEnd = MERKLE_TREE_END;
+  while (rangeEnd - rangeStart > MERKLE_LEAF_SIZE) {
+    path.push({ start: rangeStart, end: rangeEnd });
+    const mid = Math.floor((rangeStart + rangeEnd) / 2);
+    if (id <= mid) {
+      rangeEnd = mid;
+    } else {
+      rangeStart = mid;
+    }
+  }
+  path.push({ start: rangeStart, end: rangeEnd });
+  return path;
+}
+async function buildEmptyHashTable() {
+  const hashes = [await hashBucket([])];
+  for (let idx = 1; idx <= MERKLE_TREE_DEPTH; idx++) {
+    hashes.push(await hashMerkleInternalNode(hashes[idx - 1], hashes[idx - 1]));
+  }
+  return hashes;
+}
+function isRangeEmpty(sorted, start, end) {
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) {
+    const mid = lo + hi >>> 1;
+    if (sorted[mid].id <= start) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo >= sorted.length || sorted[lo].id > end;
+}
+function entriesInRange(sorted, start, end) {
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) {
+    const mid = lo + hi >>> 1;
+    if (sorted[mid].id <= start) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  const result = [];
+  for (let idx = lo; idx < sorted.length && sorted[idx].id <= end; idx++) {
+    result.push(sorted[idx]);
+  }
+  return result;
+}
+var ClientMerkleTree = class {
+  constructor(entries, leafSize) {
+    this.entries = entries;
+    this.leafSize = leafSize;
+  }
+  cache = /* @__PURE__ */ new Map();
+  hashForRange(start, end) {
+    const key = `${start},${end}`;
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+    const computed = this.computeRange(start, end);
+    this.cache.set(key, computed);
+    return computed;
+  }
+  async computeRange(start, end) {
+    const nodeSize = end - start;
+    if (nodeSize <= this.leafSize) {
+      return hashBucket(entriesInRange(this.entries, start, end));
+    }
+    if (isRangeEmpty(this.entries, start, end)) {
+      const emptyTable = await getEmptyHashTable();
+      const depth = Math.round(Math.log2(nodeSize / this.leafSize));
+      return emptyTable[Math.min(MERKLE_TREE_DEPTH, Math.max(0, depth))];
+    }
+    const mid = Math.floor((start + end) / 2);
+    const [leftHash, rightHash] = await Promise.all([
+      this.hashForRange(start, mid),
+      this.hashForRange(mid, end)
+    ]);
+    return hashMerkleInternalNode(leftHash, rightHash);
+  }
+};
+function buildEventMerkleTree(entries) {
+  const sorted = entries.map((entry) => ({ id: entry.id, updatedAt: entry.updatedAt })).sort((first, second) => first.id - second.id);
+  return new ClientMerkleTree(sorted, MERKLE_LEAF_SIZE);
+}
+function buildObjectMerkleTree(entries) {
+  const sorted = entries.map((entry) => ({ id: entry.seq, updatedAt: entry.updatedAt })).sort((first, second) => first.id - second.id);
+  return new ClientMerkleTree(sorted, MERKLE_LEAF_SIZE);
+}
+
+// vendor/cmstr/idb/merkle.ts
+var BoundMerkleTree = class {
+  constructor(store2, topic) {
+    this.store = store2;
+    this.topic = topic;
+  }
+  hashForRange(start, end) {
+    return this.store.hashForRange(this.topic, start, end);
+  }
+};
+var IDBMerkleStore = class {
+  constructor(db, storeName, readSummaries, isRangeEmpty2) {
+    this.db = db;
+    this.storeName = storeName;
+    this.readSummaries = readSummaries;
+    this.isRangeEmpty = isRangeEmpty2;
+  }
+  // Returns a topic-bound view compatible with IMerkleTree for use in merkleDiff.
+  forTopic(topic) {
+    return new BoundMerkleTree(this, topic);
+  }
+  async hashForRange(topic, start, end) {
+    const cached = await this.db.get(this.storeName, [topic, start, end]);
+    if (cached !== void 0) return cached;
+    const hash = await this.#computeRange(topic, start, end);
+    await this.db.put(this.storeName, hash, [topic, start, end]);
+    return hash;
+  }
+  // Removes all cached hashes on the path from the leaf containing id to the root.
+  async invalidatePath(topic, id) {
+    const tx = this.db.transaction(this.storeName, "readwrite");
+    const store2 = tx.objectStore(this.storeName);
+    for (const node of merklePath(id)) {
+      store2.delete([topic, node.start, node.end]);
+    }
+    await tx.done;
+  }
+  // Invalidates both old and new seq paths in a single transaction — handles objects where seq changes on update.
+  async invalidatePaths(topic, newId, oldId) {
+    if (oldId === void 0 || oldId === newId) {
+      return this.invalidatePath(topic, newId);
+    }
+    const tx = this.db.transaction(this.storeName, "readwrite");
+    const store2 = tx.objectStore(this.storeName);
+    for (const node of merklePath(newId)) {
+      store2.delete([topic, node.start, node.end]);
+    }
+    for (const node of merklePath(oldId)) {
+      store2.delete([topic, node.start, node.end]);
+    }
+    await tx.done;
+  }
+  async #computeRange(topic, start, end) {
+    const nodeSize = end - start;
+    if (nodeSize <= MERKLE_LEAF_SIZE) {
+      const entries = await this.readSummaries(topic, start, end);
+      return hashBucket(entries);
+    }
+    if (await this.isRangeEmpty(topic, start, end)) {
+      const emptyTable = await getEmptyHashTable();
+      const depth = Math.round(Math.log2(nodeSize / MERKLE_LEAF_SIZE));
+      return emptyTable[Math.min(MERKLE_TREE_DEPTH, Math.max(0, depth))];
+    }
+    const mid = Math.floor((start + end) / 2);
+    const [leftHash, rightHash] = await Promise.all([
+      this.hashForRange(topic, start, mid),
+      this.hashForRange(topic, mid, end)
+    ]);
+    return hashMerkleInternalNode(leftHash, rightHash);
+  }
+};
+
 // vendor/cmstr/idb/index.ts
-var IDB_VERSION = 2;
+var IDB_VERSION = 3;
+var IDB_MERKLE_EVENT_STORE = "merkle-events";
+var IDB_MERKLE_OBJECT_STORE = "merkle-objects";
 var IDBBackend = class _IDBBackend {
   events;
   objects;
   cursors;
+  merkleEvents;
+  merkleObjects;
   constructor(db) {
     this.events = new IDBEventStore(db);
     this.objects = new IDBObjectStore2(db);
     this.cursors = new IDBCursorStore(db);
+    this.merkleEvents = new IDBMerkleStore(
+      db,
+      IDB_MERKLE_EVENT_STORE,
+      (topic, start, end) => this.events.readEventSummaries(topic, start, end),
+      (topic, start, end) => this.events.isEventRangeEmpty(topic, start, end)
+    );
+    this.merkleObjects = new IDBMerkleStore(
+      db,
+      IDB_MERKLE_OBJECT_STORE,
+      (topic, start, end) => this.objects.readObjectSummaries(topic, start, end),
+      (topic, start, end) => this.objects.isObjectRangeEmpty(topic, start, end)
+    );
   }
+  // Opens (or creates) the named IndexedDB database and returns a ready backend.
   static async open(name) {
     const db = await openDB(name, IDB_VERSION, {
       upgrade(db2, oldVersion, _newVersion, transaction) {
-        if (oldVersion < 1) {
+        if (oldVersion === 0) {
           db2.createObjectStore(IDB_EVENT_STORE);
-          const store2 = db2.createObjectStore(IDB_OBJECT_STORE);
-          store2.createIndex("by-seq", ["topic", "seq"], { unique: false });
+          const objStore = db2.createObjectStore(IDB_OBJECT_STORE);
+          objStore.createIndex("by-seq", ["topic", "seq"], { unique: false });
           db2.createObjectStore(IDB_CURSOR_STORE);
+          db2.createObjectStore(IDB_MERKLE_EVENT_STORE);
+          db2.createObjectStore(IDB_MERKLE_OBJECT_STORE);
           return;
         }
         if (oldVersion < 2) {
           const store2 = transaction.objectStore(IDB_OBJECT_STORE);
           store2.deleteIndex("by-seq");
           store2.createIndex("by-seq", ["topic", "seq"], { unique: false });
+        }
+        if (oldVersion < 3) {
+          db2.deleteObjectStore(IDB_EVENT_STORE);
+          db2.createObjectStore(IDB_EVENT_STORE);
+          db2.deleteObjectStore(IDB_CURSOR_STORE);
+          db2.createObjectStore(IDB_CURSOR_STORE);
+          db2.createObjectStore(IDB_MERKLE_EVENT_STORE);
+          db2.createObjectStore(IDB_MERKLE_OBJECT_STORE);
         }
       }
     });
@@ -2623,55 +2824,46 @@ var SetIntervalScheduler = class {
   }
 };
 
-// vendor/cmstr/diff.ts
-function groupByBucket(entries, bucketSize) {
-  const map = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const start = Math.floor((entry.id - 1) / bucketSize) * bucketSize;
-    if (!map.has(start)) map.set(start, []);
-    map.get(start).push(entry);
-  }
-  return map;
-}
-async function buildDiffRequest(entries, bucketSize) {
-  const bucketMap = groupByBucket(entries, bucketSize);
-  const bucketStarts = [...bucketMap.keys()].sort((first, second) => first - second);
-  const buckets = await Promise.all(bucketStarts.map(async (start) => {
-    const sorted = (bucketMap.get(start) ?? []).sort((first, second) => first.id - second.id);
-    const hash = await hashBucket(sorted);
-    return { start, end: start + bucketSize, hash };
-  }));
-  const root = await hashBucketRoot(buckets.map((bucket) => bucket.hash));
-  return { root, buckets };
-}
-function buildEventDiffRequest(entries) {
-  return buildDiffRequest(
-    entries.map((entry) => ({ id: entry.id, updatedAt: entry.updatedAt })),
-    DEFAULT_EVENT_BUCKET_SIZE
-  );
-}
-function buildObjectDiffRequest(entries) {
-  return buildDiffRequest(
-    entries.map((entry) => ({ id: entry.seq, updatedAt: entry.updatedAt })),
-    DEFAULT_OBJECT_BUCKET_SIZE
-  );
-}
-
 // vendor/cmstr/sync.ts
 var STATUS_NO_CONTENT = 204;
 function authHeaders(token) {
   return { "Authorization": `Bearer ${token}` };
 }
-async function postDiff(baseUrl, topic, token, body) {
+async function postDiffRound(baseUrl, topic, token, nodes) {
   const res = await fetch(`${baseUrl}/diff/${topic}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ nodes })
   });
   if (res.status === STATUS_NO_CONTENT) return { kind: "match" };
   if (!res.ok) throw new Error(`POST /diff/${topic} failed: ${res.status}`);
   const json = await res.json();
-  return { kind: "diff", ranges: json.ranges };
+  return { kind: "diff", mismatches: json.mismatches };
+}
+async function merkleDiff(baseUrl, topic, token, tree) {
+  const rootHash = await tree.hashForRange(0, MERKLE_TREE_END);
+  let frontier = [{ start: 0, end: MERKLE_TREE_END, hash: rootHash }];
+  const leafRanges = [];
+  while (frontier.length > 0) {
+    const response = await postDiffRound(baseUrl, topic, token, frontier);
+    if (response.kind === "match") break;
+    const nextFrontier = [];
+    for (const mismatch of response.mismatches) {
+      if (mismatch.isLeaf) {
+        leafRanges.push({ start: mismatch.start, end: mismatch.end });
+      } else {
+        const mid = Math.floor((mismatch.start + mismatch.end) / 2);
+        const [leftHash, rightHash] = await Promise.all([
+          tree.hashForRange(mismatch.start, mid),
+          tree.hashForRange(mid, mismatch.end)
+        ]);
+        nextFrontier.push({ start: mismatch.start, end: mid, hash: leftHash });
+        nextFrontier.push({ start: mid, end: mismatch.end, hash: rightHash });
+      }
+    }
+    frontier = nextFrontier;
+  }
+  return leafRanges;
 }
 async function fetchEventRange(baseUrl, topic, token, start, size) {
   const res = await fetch(`${baseUrl}/events/${topic}?start=${start}&size=${size}`, { headers: authHeaders(token) });
@@ -2714,54 +2906,53 @@ async function tailEventStream(baseUrl, topic, token, startId, durationMs = TAIL
   }
   return collected;
 }
-async function applyEventEntry(backend, topic, entry) {
+async function applyEventEntry(backend, topic, entry, skipMerkle = false) {
   await backend.events.updateEvent(topic, entry.id, entry.payload, { createdAt: entry.createdAt, updatedAt: entry.updatedAt });
+  if (!skipMerkle) await backend.merkleEvents?.invalidatePath(topic, entry.id);
   return { type: "upsert", topic, entry };
 }
-async function applyObjectEntry(backend, topic, entry) {
+async function applyObjectEntry(backend, topic, entry, skipMerkle = false) {
+  const existing = !skipMerkle && backend.merkleObjects ? await backend.objects.readObject(topic, entry.id) : void 0;
+  const oldSeq = existing?.seq;
   const timestamps = { seq: entry.seq, createdAt: entry.createdAt, updatedAt: entry.updatedAt };
   if (entry.payload === null) {
     await backend.objects.deleteObject(topic, entry.id, timestamps);
-    return { type: "delete", topic, id: entry.id };
+  } else {
+    await backend.objects.upsertObject(topic, entry.id, entry.payload, timestamps);
   }
-  await backend.objects.upsertObject(topic, entry.id, entry.payload, timestamps);
+  if (!skipMerkle) await backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
+  if (entry.payload === null) return { type: "delete", topic, id: entry.id };
   return { type: "upsert", topic, entry };
 }
-async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs, onProgress) {
+async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs) {
   const cursor = await backend.cursors.getEventCursor(topic);
-  const local = await backend.events.readEvents(topic, {}) ?? [];
   const changes = [];
-  if (local.length === 0 && cursor === 0) {
+  if (cursor === 0) {
     let start = 1;
     let maxId2 = 0;
-    let count = 0;
     while (true) {
-      const entries = await fetchEventRange(baseUrl, topic, token, start, DEFAULT_EVENT_BUCKET_SIZE);
+      const entries = await fetchEventRange(baseUrl, topic, token, start, DEFAULT_FETCH_PAGE_SIZE);
       for (const entry of entries) {
-        changes.push(await applyEventEntry(backend, topic, entry));
+        changes.push(await applyEventEntry(backend, topic, entry, true));
         maxId2 = Math.max(maxId2, entry.id);
-        count++;
       }
-      onProgress?.(count);
-      if (entries.length < DEFAULT_EVENT_BUCKET_SIZE) break;
+      if (entries.length < DEFAULT_FETCH_PAGE_SIZE) break;
       start = entries[entries.length - 1].id + 1;
     }
     const tailed2 = await tailEventStream(baseUrl, topic, token, maxId2 + 1, tailDurationMs);
     for (const entry of tailed2) {
-      changes.push(await applyEventEntry(backend, topic, entry));
+      changes.push(await applyEventEntry(backend, topic, entry, true));
       maxId2 = Math.max(maxId2, entry.id);
-      count++;
     }
-    onProgress?.(count);
     if (maxId2 > 0) await backend.cursors.setEventCursor(topic, maxId2);
     return changes;
   }
-  const diffReq = await buildEventDiffRequest(local);
-  const result = await postDiff(baseUrl, topic, token, diffReq);
-  if (result.kind === "match") return changes;
-  let maxId = local.length > 0 ? local[local.length - 1].id : 0;
-  for (const range of result.ranges) {
-    const entries = await fetchEventRange(baseUrl, topic, token, range.start + 1, DEFAULT_EVENT_BUCKET_SIZE);
+  const tree = backend.merkleEvents ? backend.merkleEvents.forTopic(topic) : buildEventMerkleTree(await backend.events.readEvents(topic, {}) ?? []);
+  const leafRanges = await merkleDiff(baseUrl, topic, token, tree);
+  if (leafRanges.length === 0) return changes;
+  let maxId = cursor;
+  for (const range of leafRanges) {
+    const entries = await fetchEventRange(baseUrl, topic, token, range.start + 1, MERKLE_LEAF_SIZE);
     for (const entry of entries) {
       changes.push(await applyEventEntry(backend, topic, entry));
       maxId = Math.max(maxId, entry.id);
@@ -2776,29 +2967,29 @@ async function syncEventTopic(backend, baseUrl, token, topic, tailDurationMs, on
   return changes;
 }
 async function syncObjectTopic(backend, baseUrl, token, topic) {
-  const local = await backend.objects.readObjectsBySeq(topic, {}) ?? [];
+  const cursor = await backend.cursors.getObjectCursor(topic);
   const changes = [];
-  if (local.length === 0) {
+  if (cursor === 0) {
     let start = 1;
     let maxSeq2 = 0;
     while (true) {
-      const entries = await fetchObjectRange(baseUrl, topic, token, start, DEFAULT_OBJECT_BUCKET_SIZE);
+      const entries = await fetchObjectRange(baseUrl, topic, token, start, DEFAULT_FETCH_PAGE_SIZE);
       for (const entry of entries) {
-        changes.push(await applyObjectEntry(backend, topic, entry));
+        changes.push(await applyObjectEntry(backend, topic, entry, true));
         maxSeq2 = Math.max(maxSeq2, entry.seq);
       }
-      if (entries.length < DEFAULT_OBJECT_BUCKET_SIZE) break;
+      if (entries.length < DEFAULT_FETCH_PAGE_SIZE) break;
       start = entries[entries.length - 1].seq + 1;
     }
     if (maxSeq2 > 0) await backend.cursors.setObjectCursor(topic, maxSeq2);
     return changes;
   }
-  const diffReq = await buildObjectDiffRequest(local);
-  const result = await postDiff(baseUrl, topic, token, diffReq);
-  if (result.kind === "match") return changes;
-  let maxSeq = local.length > 0 ? local[local.length - 1].seq : 0;
-  for (const range of result.ranges) {
-    const entries = await fetchObjectRange(baseUrl, topic, token, range.start + 1, DEFAULT_OBJECT_BUCKET_SIZE);
+  const tree = backend.merkleObjects ? backend.merkleObjects.forTopic(topic) : buildObjectMerkleTree(await backend.objects.readObjectsBySeq(topic, {}) ?? []);
+  const leafRanges = await merkleDiff(baseUrl, topic, token, tree);
+  if (leafRanges.length === 0) return changes;
+  let maxSeq = cursor;
+  for (const range of leafRanges) {
+    const entries = await fetchObjectRange(baseUrl, topic, token, range.start + 1, MERKLE_LEAF_SIZE);
     for (const entry of entries) {
       changes.push(await applyObjectEntry(backend, topic, entry));
       maxSeq = Math.max(maxSeq, entry.seq);
@@ -2859,6 +3050,7 @@ var CommonStorageNode = class {
   async postEvent(topic, payload) {
     const entry = await this.backend.events.writeEvent(topic, payload);
     if (entry) {
+      await this.backend.merkleEvents?.invalidatePath(topic, entry.id);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushEvent(topic, "POST", payload);
     }
@@ -2867,6 +3059,7 @@ var CommonStorageNode = class {
   async putEvent(topic, id, payload) {
     const result = await this.backend.events.updateEvent(topic, id, payload);
     if (result) {
+      await this.backend.merkleEvents?.invalidatePath(topic, id);
       this.#emit({ type: "upsert", topic, entry: result.entry });
       await this.#pushEvent(topic, "PUT", payload, id);
     }
@@ -2879,16 +3072,20 @@ var CommonStorageNode = class {
     return this.backend.objects.readObjectsBySeq(topic, opts);
   }
   async putObject(topic, id, payload) {
+    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : void 0;
     const entry = await this.backend.objects.upsertObject(topic, id, payload);
     if (entry) {
+      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "upsert", topic, entry });
       await this.#pushObject(topic, id, "PUT", payload);
     }
     return entry;
   }
   async deleteObject(topic, id) {
+    const oldSeq = this.backend.merkleObjects ? (await this.backend.objects.readObject(topic, id))?.seq : void 0;
     const entry = await this.backend.objects.deleteObject(topic, id);
     if (entry) {
+      await this.backend.merkleObjects?.invalidatePaths(topic, entry.seq, oldSeq);
       this.#emit({ type: "delete", topic, id });
       await this.#pushObject(topic, id, "DELETE");
     }
@@ -5025,7 +5222,53 @@ var import_mithril12 = __toESM(require_mithril(), 1);
 
 // ts/components/auth-modal.ts
 var import_mithril2 = __toESM(require_mithril(), 1);
+
+// ts/auth.ts
+var TOPIC_PREFIX = "topic = ";
+var METHODS_PREFIX = "methods = ";
+function decodeBase64(input) {
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  return atob(normalized);
+}
+function extractCaveats(token) {
+  let binary;
+  try {
+    binary = decodeBase64(token);
+  } catch {
+    return [];
+  }
+  const caveats = [];
+  let pos = 0;
+  while (pos + 4 <= binary.length) {
+    const lengthHex = binary.slice(pos, pos + 4);
+    const length = parseInt(lengthHex, 16);
+    if (isNaN(length) || length < 4) break;
+    const content = binary.slice(pos + 4, pos + length - 1);
+    if (content.startsWith("cid ")) {
+      caveats.push(content.slice(4));
+    }
+    pos += length;
+  }
+  return caveats;
+}
+function parsePermissions(token) {
+  const caveats = extractCaveats(token);
+  const topicCaveat = caveats.find((caveat) => caveat.startsWith(TOPIC_PREFIX));
+  const methodsCaveat = caveats.find((caveat) => caveat.startsWith(METHODS_PREFIX));
+  if (topicCaveat !== void 0) {
+    const allowedTopic = topicCaveat.slice(TOPIC_PREFIX.length);
+    if (allowedTopic !== BOOKMARKS_TOPIC) return null;
+  }
+  const methods = methodsCaveat ? methodsCaveat.slice(METHODS_PREFIX.length).split(",") : null;
+  const canRead = methods === null || methods.includes("GET");
+  const canWrite = methods === null || methods.includes("POST") || methods.includes("PUT");
+  if (!canRead && !canWrite) return null;
+  return { canRead, canWrite };
+}
+
+// ts/components/auth-modal.ts
 var tokenDraft = "";
+var permissionError = "";
 function onTokenInput(event) {
   tokenDraft = event.target.value;
 }
@@ -5035,6 +5278,15 @@ async function submitToken(event) {
   const input = form.querySelector("input");
   const token = (input?.value ?? tokenDraft).trim();
   if (!token) return;
+  const permissions = parsePermissions(token);
+  if (permissions === null) {
+    permissionError = "token does not cover the bookmark topic";
+    import_mithril2.default.redraw();
+    return;
+  }
+  permissionError = "";
+  writePermissions(permissions);
+  store.setPermissions(permissions);
   await writeToken(token);
   store.setToken(token);
   tokenDraft = "";
@@ -5077,6 +5329,7 @@ function AuthModal() {
                 vnode.dom.focus();
               }
             }),
+            permissionError ? (0, import_mithril2.default)("p.modal-error", permissionError) : null,
             (0, import_mithril2.default)("button.modal-submit[type=submit]", "CONNECT")
           ])
         ])
@@ -5601,7 +5854,9 @@ var saveBar = SaveBar();
 function App() {
   return {
     view() {
-      const writeOnly = store.state.writeOnly;
+      const { writeOnly, permissions } = store.state;
+      const canRead = !writeOnly && (permissions?.canRead ?? true);
+      const canWrite = permissions?.canWrite ?? true;
       return (0, import_mithril12.default)("div.app-inner", [
         (0, import_mithril12.default)("div.brand", { onclick: () => store.setQuery("", runSearch("", store.state.bookmarks)) }, [
           "bkmk",
@@ -5610,11 +5865,11 @@ function App() {
         (0, import_mithril12.default)(authModal),
         (0, import_mithril12.default)(helpModal),
         (0, import_mithril12.default)(errorModal),
-        writeOnly ? null : (0, import_mithril12.default)(syncProgress),
-        writeOnly ? null : (0, import_mithril12.default)(prompt),
-        writeOnly ? null : (0, import_mithril12.default)(bookmarkList),
-        (0, import_mithril12.default)(saveBar),
-        writeOnly ? null : (0, import_mithril12.default)(helpbar)
+        canRead ? (0, import_mithril12.default)(syncProgress) : null,
+        canRead ? (0, import_mithril12.default)(prompt) : null,
+        canRead ? (0, import_mithril12.default)(bookmarkList) : null,
+        canWrite ? (0, import_mithril12.default)(saveBar) : null,
+        canRead ? (0, import_mithril12.default)(helpbar) : null
       ]);
     }
   };
@@ -5630,14 +5885,32 @@ window.addEventListener("unhandledrejection", (event) => {
   const stack = err instanceof Error ? err.stack ?? "(no stack)" : "(no stack)";
   store.setFatalError(message, stack);
 });
+function registerTokenFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const urlToken = params.get("token");
+  if (!urlToken) return false;
+  params.delete("token");
+  const cleanSearch = params.size > 0 ? `?${params}` : "";
+  history.replaceState(null, "", `${location.pathname}${cleanSearch}${location.hash}`);
+  const permissions = parsePermissions(urlToken);
+  if (!permissions) return false;
+  writeToken(urlToken);
+  writePermissions(permissions);
+  store.setToken(urlToken);
+  store.setPermissions(permissions);
+  return true;
+}
 async function main() {
+  const hadUrlToken = registerTokenFromUrl();
   const token = readToken();
-  const hadAuthError = readAuthError();
+  const hadAuthError = hadUrlToken ? false : readAuthError();
+  const permissions = readPermissions();
   if (token) {
     store.setToken(token);
   } else {
     store.openAuthModal();
   }
+  if (permissions) store.setPermissions(permissions);
   if (token && hadAuthError) store.openAuthModal();
   import_mithril13.default.mount(document.getElementById("app"), App());
   if (token && !hadAuthError) {
