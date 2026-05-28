@@ -51,6 +51,12 @@ function onInput(event: Event): void {
   }
 }
 
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") {
+    (event.target as HTMLInputElement).blur();
+  }
+}
+
 export function SaveBar() {
   return {
     view() {
@@ -62,6 +68,7 @@ export function SaveBar() {
             type:        "text",
             placeholder: "url…",
             oninput:     onInput,
+            onkeydown:   onKeydown,
             oncreate(vnode: m.VnodeDOM) {
               (vnode.dom as HTMLInputElement).focus();
             },
